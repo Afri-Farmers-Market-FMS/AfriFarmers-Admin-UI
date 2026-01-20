@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Users, Sprout, Briefcase, Map, ArrowRight, Activity, TrendingUp, Building2, Wallet, Download } from 'lucide-react';
-import { GrowthLineChart, FinancialHealthChart, OperationalScaleChart } from '../components/DashboardCharts';
+import { Users, Sprout, Map, ArrowRight, Activity, TrendingUp, Building2, Download } from 'lucide-react';
+import { GrowthLineChart, OperationalScaleChart } from '../components/DashboardCharts';
 import { farmerService } from '../services/api';
 import { DashboardData, Farmer } from '../types';
 import { Link } from 'react-router-dom';
@@ -49,19 +49,20 @@ const Dashboard = () => {
   };
   
   // No-op for save since this is just a view/edit from dashboard
-  const handleSave = async (updatedFarmer: any) => {
+  const handleSave = async () => {
     // In a real app, update state/backend here
     setIsModalOpen(false);
   };
 
   const handleDownload = () => {
     const element = document.getElementById('dashboard-content');
+    if (!element) return;
     const opt = {
       margin:       10,
       filename:     `AfriFarmers_Report_${new Date().toISOString().split('T')[0]}.pdf`,
-      image:        { type: 'jpeg', quality: 0.98 },
+      image:        { type: 'jpeg' as const, quality: 0.98 },
       html2canvas:  { scale: 2, useCORS: true, windowWidth: 1440 },
-      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' as const }
     };
     html2pdf().set(opt).from(element).save();
   };
@@ -77,7 +78,7 @@ const Dashboard = () => {
     );
   }
 
-  const { stats, districtData, revenueData, businessSizeData, recentFarmers, growthData } = data;
+  const { stats, businessSizeData, recentFarmers, growthData } = data;
 
   // Key Metrics Card Config
   const statsConfig = [

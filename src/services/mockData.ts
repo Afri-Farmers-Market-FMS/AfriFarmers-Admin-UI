@@ -2690,7 +2690,7 @@ export const initialFarmers: Farmer[] = [
   {
     "id": 1080,
     "businessName": "Supporting in creating digital content,Rwandan,1199680056775111,29,Male,Bachelor,None,Medium (21 - 100 employees),Medium (20.1 - 100 million RWF),Between 2",
-    "ownership": "400",
+    "ownership": "Non youth-owned",
     "commencementDate": "001 - 3",
     "province": "600",
     "district": "000 RWF,50,30,14,Cultivation of fresh produce such as maize",
@@ -3098,7 +3098,7 @@ export const initialFarmers: Farmer[] = [
   {
     "id": 1092,
     "businessName": "rice",
-    "ownership": "tomatoes",
+    "ownership": "Non youth-owned",
     "commencementDate": "fruits",
     "province": "and other crops.,oya",
     "district": "",
@@ -3200,7 +3200,7 @@ export const initialFarmers: Farmer[] = [
   {
     "id": 1096,
     "businessName": "Supporting in creating digital content,Rwandan,,31,Male,,None,Small (3 - 20 employees),Medium (20.9 - 100 million RWF),Between 3",
-    "ownership": "600",
+    "ownership": "Non youth-owned",
     "commencementDate": "000 - 4",
     "province": "800",
     "district": "000 RWF,7,5,7,Cereals,",
@@ -3574,7 +3574,7 @@ export const initialFarmers: Farmer[] = [
   {
     "id": 1108,
     "businessName": "Unnamed Business",
-    "ownership": "Other",
+    "ownership": "Non youth-owned",
     "commencementDate": "",
     "province": "",
     "district": "",
@@ -4390,7 +4390,7 @@ export const initialFarmers: Farmer[] = [
   {
     "id": 1136,
     "businessName": "Supporting in creating digital content,Rwandan,,67,Male,,None,Small (3 - 20 employees),Small (2.9 - 20 million RWF),Between 3",
-    "ownership": "600",
+    "ownership": "Non youth-owned",
     "commencementDate": "000 - 4",
     "province": "800",
     "district": "000 RWF,4,2,1,Dairy,No",
@@ -4526,7 +4526,7 @@ export const initialFarmers: Farmer[] = [
   {
     "id": 1141,
     "businessName": "Supporting in creating digital content,Rwandaise,1199270132953201,33,Female,Bachelor,None,Micro (1 - 2 employees),Micro (less than 2 million RWF),Less than 840",
-    "ownership": "000 RWF,1,1,1,Cultivation of fresh produce such as maize",
+    "ownership": "Non youth-owned",
     "commencementDate": "rice",
     "province": "tomatoes",
     "district": "fruits",
@@ -4900,7 +4900,7 @@ export const initialFarmers: Farmer[] = [
   {
     "id": 1152,
     "businessName": "Supporting in creating digital content,Rwandan ,1196680005384037,59,Male,Bachelor,None,Small (3 - 20 employees),Small (2.1 - 20 million RWF),Above 4",
-    "ownership": "800",
+    "ownership": "Non youth-owned",
     "commencementDate": "000 RWF,10,3,7,Livestock,yego",
     "province": "",
     "district": "",
@@ -5036,7 +5036,7 @@ export const initialFarmers: Farmer[] = [
   {
     "id": 1156,
     "businessName": "imbuto",
-    "ownership": "amatunda",
+    "ownership": "Non youth-owned",
     "commencementDate": "ibinyomoro,Training / capacity building,Rwanda ,1200370108219099,19,Female,Advanced diploma,None,Micro (1 - 2 employees),Micro (less than 2 million RWF),Between 840",
     "province": "001 - 1",
     "district": "200",
