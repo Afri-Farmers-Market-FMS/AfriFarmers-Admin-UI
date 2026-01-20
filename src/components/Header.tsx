@@ -19,13 +19,13 @@ const Header = () => {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex justify-between items-center h-16">
                     {/* Logo */}
-                    <div className="flex items-center gap-2">
-                        <div className="bg-white/10 p-2 rounded-lg">
-                            <Sprout className="text-green-400" size={24} />
+                    <div className="flex items-center gap-3">
+                        <div className="h-12 w-12 rounded-full border-2 border-green-700 bg-white flex items-center justify-center">
+                            <Sprout className="text-green-700" size={24} />
                         </div>
                         <div>
-                            <span className="text-xl font-bold tracking-tight">AfriFarmers</span>
-                            <span className="text-xs block text-green-300 font-medium">Business Admin</span>
+                            <span className="text-xl font-bold tracking-tight text-white leading-none">Afri-Farmers Market</span>
+                            <span className="text-xs block text-green-300 font-medium tracking-wide">FMS (Farmer Management System)</span>
                         </div>
                     </div>
 

@@ -7,3 +7,18 @@
     @apply bg-gray-50 text-gray-900;
   }
 }
+
+@layer components {
+    .input-field {
+        @apply w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent focus:bg-white transition-all duration-200;
+    }
+    .input-label {
+        @apply block text-xs font-bold text-gray-700 uppercase tracking-wide mb-1.5 ml-1;
+    }
+    .section-card {
+        @apply bg-white p-6 rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow duration-300;
+    }
+    .section-header {
+        @apply flex items-center gap-2 text-sm font-bold text-green-900 uppercase tracking-wider mb-6 pb-3 border-b border-gray-100;
+    }
+}

@@ -46,6 +46,8 @@ export interface DashboardStats {
   totalEmployees: number;
   topValueChain: string;
   districtsCovered: number;
+  femaleEmployees: number;
+  youthEmployees: number;
 }
 
 export interface GraphData {
@@ -55,9 +57,11 @@ export interface GraphData {
 
 export interface DashboardData {
   stats: DashboardStats;
-  valueChainData: GraphData[];
   districtData: GraphData[];
   revenueData: GraphData[];
-  growthData: GraphData[];
+  businessSizeData: GraphData[];
   recentFarmers: Farmer[];
+  growthData: GraphData[];
+  valueChainData: GraphData[];
+  ownershipData: GraphData[];
 }
