@@ -2,7 +2,8 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Search, Filter, MapPin, Briefcase, Calendar, 
-  Trash2, Edit, Plus, X, Download, List, Grid, FileSpreadsheet, ChevronLeft, ChevronRight
+  Trash2, Edit, Plus, X, Download, List, Grid, FileSpreadsheet, ChevronLeft, ChevronRight,
+  Eye, EyeOff 
 } from 'lucide-react';
 import { farmerService } from '../services/api'; 
 import { Farmer } from '../types';
@@ -45,6 +46,15 @@ const Farmers = () => {
     const [viewMode, setViewMode] = useState<'summary' | 'detailed'>('summary');
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState<number>(10);
+    const [visibleNids, setVisibleNids] = useState<Record<string, boolean>>({});
+
+    const toggleNid = (ev: React.MouseEvent, id: string) => {
+        ev.stopPropagation();
+        setVisibleNids(prev => ({
+            ...prev,
+            [id]: !prev[id]
+        }));
+    };
 
     // --- Load Data ---
     const loadBusinesses = async () => {
@@ -192,6 +202,7 @@ const Farmers = () => {
     };
 
     const handleExportCSV = () => {
+        const revealNid = window.confirm("Security Alert: Do you want to unmask National IDs in the export file?\n\nOK = Unmask (Visible)\nCancel = Keep Masked (***********)");
         let headers: string[] = [];
         let rows: any[] = [];
         const dateStr = new Date().toISOString().split('T')[0];
@@ -207,7 +218,7 @@ const Farmers = () => {
                 `"${b.tin || ''}"`,
                 `"${b.ownerName?.replace(/"/g, '""') || ''}"`,
                 `"${b.phone || ''}"`,
-                `"${b.nid || ''}"`,
+                `"${revealNid ? (b.nid || '') : '*************'}"`,
                 `"${b.gender || ''}"`,
                 `"${b.ownerAge || ''}"`,
                 `"${b.nationality || 'Rwandan'}"`,
@@ -261,6 +272,7 @@ const Farmers = () => {
 
     const handleDownloadProfile = (e: React.MouseEvent, business: Farmer) => {
         e.stopPropagation();
+        const revealNid = window.confirm("Security Alert: Include full National ID in PDF?\n\nOK = Visible\nCancel = Masked");
         
         // Create a temporary hidden container
         const element = document.createElement('div');
@@ -286,7 +298,7 @@ const Farmers = () => {
                     <h3 style="background: #f0fdf4; color: #065f46; padding: 10px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; font-weight: bold; margin-bottom: 15px;">Identity & Demographics</h3>
                     <table style="width: 100%; border-collapse: collapse;">
                         <tr><td style="padding: 8px 0; color: #64748b; width: 40%;">Owner Name:</td><td style="font-weight: 500;">${business.ownerName}</td></tr>
-                        <tr><td style="padding: 8px 0; color: #64748b;">NID:</td><td style="font-weight: 500;">${business.nid || 'N/A'}</td></tr>
+                        <tr><td style="padding: 8px 0; color: #64748b;">NID:</td><td style="font-weight: 500;">${revealNid ? (business.nid || 'N/A') : '*************'}</td></tr>
                         <tr><td style="padding: 8px 0; color: #64748b;">Phone:</td><td style="font-weight: 500;">${business.phone}</td></tr>
                         <tr><td style="padding: 8px 0; color: #64748b;">Gender/Age:</td><td style="font-weight: 500;">${business.gender || '-'} / ${business.ownerAge || '-'}</td></tr>
                         <tr><td style="padding: 8px 0; color: #64748b;">Education:</td><td style="font-weight: 500;">${business.educationLevel || '-'}</td></tr>
@@ -545,7 +557,20 @@ const Farmers = () => {
                                             <td className="px-2 py-1.5 font-mono text-gray-500 border-r border-gray-50">{business.tin}</td>
                                             <td className="px-2 py-1.5 border-r border-gray-50 text-gray-700">{business.ownerName}</td>
                                             <td className="px-2 py-1.5 font-mono text-gray-600 border-r border-gray-50">{business.phone}</td>
-                                            <td className="px-2 py-1.5 font-mono text-gray-500 border-r border-gray-50">{business.nid || '-'}</td>
+                                            <td className="px-2 py-1.5 font-mono text-gray-500 border-r border-gray-50 min-w-[120px]">
+                                                <div className="flex items-center gap-2 group/nid">
+                                                    <span>{visibleNids[business.id] ? (business.nid || '-') : (business.nid ? '***********' : '-')}</span>
+                                                    {business.nid && (
+                                                        <button 
+                                                        onClick={(e) => toggleNid(e, String(business.id))} 
+                                                        className="opacity-0 group-hover/nid:opacity-100 transition-opacity p-1 hover:bg-green-100 rounded-full text-green-600"
+                                                        title={visibleNids[business.id] ? "Hide ID" : "Show ID"}
+                                                        >
+                                                            {visibleNids[business.id] ? <EyeOff size={14}/> : <Eye size={14}/>}
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </td>
                                             <td className="px-2 py-1.5 border-r border-gray-50">{business.gender || '-'}</td>
                                             <td className="px-2 py-1.5 border-r border-gray-50">{business.ownerAge || '-'}</td>
                                             <td className="px-2 py-1.5 border-r border-gray-50">{business.nationality || 'Rwandan'}</td>
