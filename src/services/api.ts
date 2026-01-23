@@ -1,7 +1,7 @@
 import { Farmer, DashboardData } from '../types';
 import { initialFarmers } from './mockData';
 
-const STORAGE_KEY = 'afm_businesses_registry_v2';
+const STORAGE_KEY = 'afm_businesses_registry_v3';
 
 // Simulate a slight delay to mimic API calls
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));

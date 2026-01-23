@@ -1,6 +1,7 @@
-import { LayoutDashboard, Users, Settings, PieChart, LogOut, Menu, X, Sprout } from 'lucide-react';
+import { LayoutDashboard, Users, Settings, PieChart, LogOut, Menu, X } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { useState } from 'react';
+import logo from '../assets/logo.png';
 
 const Header = () => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -20,8 +21,8 @@ const Header = () => {
                 <div className="flex justify-between items-center h-16">
                     {/* Logo */}
                     <div className="flex items-center gap-3">
-                        <div className="h-12 w-12 rounded-full border-2 border-green-700 bg-white flex items-center justify-center">
-                            <Sprout className="text-green-700" size={24} />
+                        <div className="h-12 w-12 rounded-full border-2 border-green-700 bg-white flex items-center justify-center overflow-hidden">
+                            <img src={logo} alt="Afri-Farmers Logo" className="w-full h-full object-cover" />
                         </div>
                         <div>
                             <span className="text-xl font-bold tracking-tight text-white leading-none">Afri-Farmers Market</span>
