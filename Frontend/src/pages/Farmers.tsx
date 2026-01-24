@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Search, Filter, MapPin, Briefcase, Calendar, 
   Trash2, Edit, Plus, X, Download, List, Grid, FileSpreadsheet, ChevronLeft, ChevronRight,
-  Eye, EyeOff 
+  Eye, EyeOff, Upload, FileDown, AlertCircle, CheckCircle, Loader2 
 } from 'lucide-react';
 import { farmerService } from '../services/api'; 
 import { Farmer } from '../types';
@@ -68,6 +68,23 @@ const Farmers = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState<number>(10);
     const [visibleNids, setVisibleNids] = useState<Record<string, boolean>>({});
+
+    // --- Bulk Upload State ---
+    const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
+    const [bulkUploadFile, setBulkUploadFile] = useState<File | null>(null);
+    const [bulkUploadLoading, setBulkUploadLoading] = useState(false);
+    const [bulkUploadResult, setBulkUploadResult] = useState<{
+        success: boolean;
+        message: string;
+        totalRows?: number;
+        importedCount?: number;
+        duplicateCount?: number;
+        errorCount?: number;
+        errors?: { row: number; errors: string[] }[];
+        duplicates?: { row: number; reason: string }[];
+        error?: string;
+    } | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const toggleNid = (ev: React.MouseEvent, id: string) => {
         ev.stopPropagation();
@@ -437,6 +454,78 @@ const Farmers = () => {
         html2pdf().set(opt).from(element).save();
     };
 
+    // --- Bulk Upload Handlers ---
+    const handleDownloadTemplate = async () => {
+        try {
+            const blob = await farmerService.downloadTemplate();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'farmers_import_template.xlsx';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        } catch (err: any) {
+            alert('Failed to download template: ' + (err.message || 'Unknown error'));
+        }
+    };
+
+    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            // Validate file type
+            const validTypes = [
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'application/vnd.ms-excel'
+            ];
+            if (!validTypes.includes(file.type) && !file.name.match(/\.(xlsx|xls)$/)) {
+                alert('Please upload an Excel file (.xlsx or .xls)');
+                return;
+            }
+            setBulkUploadFile(file);
+            setBulkUploadResult(null);
+        }
+    };
+
+    const handleBulkUpload = async () => {
+        if (!bulkUploadFile) return;
+
+        setBulkUploadLoading(true);
+        setBulkUploadResult(null);
+
+        try {
+            const result = await farmerService.uploadExcel(bulkUploadFile);
+            console.log('📊 Upload result:', result);
+            
+            // Set the result regardless of success/failure - it contains detailed info
+            setBulkUploadResult(result);
+            
+            // Refresh the list if any records were imported
+            if (result.importedCount && result.importedCount > 0) {
+                console.log('🔄 Refreshing business list...');
+                await loadBusinesses();
+            }
+        } catch (err: any) {
+            console.error('❌ Upload error:', err);
+            setBulkUploadResult({
+                success: false,
+                message: err.message || 'Failed to upload file. Please check your connection and try again.',
+            });
+        } finally {
+            setBulkUploadLoading(false);
+        }
+    };
+
+    const closeBulkUploadModal = () => {
+        setShowBulkUploadModal(false);
+        setBulkUploadFile(null);
+        setBulkUploadResult(null);
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
+    };
+
     // --- Render ---
     if (loading) return <div className="flex items-center justify-center h-full text-green-700">Loading Directory...</div>;
 
@@ -512,9 +601,18 @@ const Farmers = () => {
                     </button>
 
                     {canEdit && (
-                        <button onClick={handleAdd} className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-green-700 shadow-sm hover:shadow-md transition-all">
-                            <Plus size={18} /> <span className="hidden sm:inline">Add New</span>
-                        </button>
+                        <>
+                            <button 
+                                onClick={() => setShowBulkUploadModal(true)} 
+                                className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium flex items-center gap-2 hover:bg-blue-700 shadow-sm transition-all"
+                                title="Bulk import from Excel"
+                            >
+                                <Upload size={18} /> <span className="hidden sm:inline">Bulk Import</span>
+                            </button>
+                            <button onClick={handleAdd} className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-green-700 shadow-sm hover:shadow-md transition-all">
+                                <Plus size={18} /> <span className="hidden sm:inline">Add New</span>
+                            </button>
+                        </>
                     )}
                 </div>
             </div>
@@ -870,6 +968,305 @@ const Farmers = () => {
                 mode={modalMode}
                 readOnly={isViewer}
             />
+
+            {/* Bulk Upload Modal */}
+            {showBulkUploadModal && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+                        {/* Header */}
+                        <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6">
+                            <div className="flex justify-between items-center">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                                        <Upload size={24} />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-xl font-bold">Bulk Import Businesses</h2>
+                                        <p className="text-blue-100 text-sm">Import multiple businesses from Excel file</p>
+                                    </div>
+                                </div>
+                                <button 
+                                    onClick={closeBulkUploadModal} 
+                                    className="text-white/80 hover:text-white hover:bg-white/20 p-2 rounded-lg transition-colors"
+                                >
+                                    <X size={24} />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Content */}
+                        <div className="p-6 overflow-y-auto flex-1">
+                            {/* Step 1: Download Template */}
+                            <div className="mb-6">
+                                <div className="flex items-center gap-2 mb-3">
+                                    <div className="w-6 h-6 bg-blue-100 text-blue-700 rounded-full flex items-center justify-center text-sm font-bold">1</div>
+                                    <h3 className="font-semibold text-gray-800">Download Template</h3>
+                                </div>
+                                <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+                                    <p className="text-gray-600 text-sm mb-4">
+                                        Download the Excel template with the required column format. Fill in your data offline and upload when ready.
+                                    </p>
+                                    <button
+                                        onClick={handleDownloadTemplate}
+                                        className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm font-medium flex items-center gap-2 hover:bg-gray-50 hover:border-gray-400 transition-all"
+                                    >
+                                        <FileDown size={18} /> Download Template (.xlsx)
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Step 2: Upload File */}
+                            <div className="mb-6">
+                                <div className="flex items-center gap-2 mb-3">
+                                    <div className="w-6 h-6 bg-blue-100 text-blue-700 rounded-full flex items-center justify-center text-sm font-bold">2</div>
+                                    <h3 className="font-semibold text-gray-800">Upload Filled File</h3>
+                                </div>
+                                <div className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-blue-400 transition-colors">
+                                    <input
+                                        ref={fileInputRef}
+                                        type="file"
+                                        accept=".xlsx,.xls"
+                                        onChange={handleFileSelect}
+                                        className="hidden"
+                                        id="bulk-upload-file"
+                                    />
+                                    <label 
+                                        htmlFor="bulk-upload-file" 
+                                        className="cursor-pointer"
+                                    >
+                                        {bulkUploadFile ? (
+                                            <div className="flex items-center justify-center gap-3">
+                                                <FileSpreadsheet size={32} className="text-green-600" />
+                                                <div className="text-left">
+                                                    <p className="font-medium text-gray-800">{bulkUploadFile.name}</p>
+                                                    <p className="text-sm text-gray-500">{(bulkUploadFile.size / 1024).toFixed(1)} KB</p>
+                                                </div>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.preventDefault();
+                                                        setBulkUploadFile(null);
+                                                        setBulkUploadResult(null);
+                                                        if (fileInputRef.current) fileInputRef.current.value = '';
+                                                    }}
+                                                    className="ml-2 text-red-500 hover:text-red-700 p-1"
+                                                >
+                                                    <X size={18} />
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <Upload size={32} className="mx-auto text-gray-400 mb-2" />
+                                                <p className="text-gray-600 font-medium">Click to select file or drag & drop</p>
+                                                <p className="text-gray-400 text-sm mt-1">Supports .xlsx and .xls files</p>
+                                            </>
+                                        )}
+                                    </label>
+                                </div>
+                            </div>
+
+                            {/* Upload Result */}
+                            {bulkUploadResult && (
+                                <div className={`mb-6 p-4 rounded-xl ${bulkUploadResult.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+                                    <div className="flex items-start gap-3">
+                                        {bulkUploadResult.success ? (
+                                            <CheckCircle className="text-green-600 flex-shrink-0" size={24} />
+                                        ) : (
+                                            <AlertCircle className="text-red-600 flex-shrink-0" size={24} />
+                                        )}
+                                        <div className="flex-1">
+                                            <h4 className={`font-semibold ${bulkUploadResult.success ? 'text-green-800' : 'text-red-800'}`}>
+                                                {bulkUploadResult.success ? 'Import Successful!' : 'Import Failed'}
+                                            </h4>
+                                            <p className={`text-sm ${bulkUploadResult.success ? 'text-green-700' : 'text-red-700'}`}>
+                                                {bulkUploadResult.message}
+                                            </p>
+                                            
+                                            {/* Stats Grid - show when we have any data */}
+                                            {(bulkUploadResult.totalRows !== undefined || bulkUploadResult.importedCount !== undefined || bulkUploadResult.errorCount !== undefined) && (
+                                                <div className="mt-3 grid grid-cols-4 gap-3 text-center">
+                                                    <div className="bg-white rounded-lg p-2">
+                                                        <div className="text-lg font-bold text-gray-800">{bulkUploadResult.totalRows ?? '-'}</div>
+                                                        <div className="text-xs text-gray-500">Total Rows</div>
+                                                    </div>
+                                                    <div className="bg-white rounded-lg p-2">
+                                                        <div className="text-lg font-bold text-green-600">{bulkUploadResult.importedCount ?? 0}</div>
+                                                        <div className="text-xs text-gray-500">Imported</div>
+                                                    </div>
+                                                    <div className="bg-white rounded-lg p-2">
+                                                        <div className="text-lg font-bold text-amber-600">{bulkUploadResult.duplicateCount ?? 0}</div>
+                                                        <div className="text-xs text-gray-500">Duplicates</div>
+                                                    </div>
+                                                    <div className="bg-white rounded-lg p-2">
+                                                        <div className="text-lg font-bold text-red-600">{bulkUploadResult.errorCount ?? 0}</div>
+                                                        <div className="text-xs text-gray-500">Errors</div>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Clickable Duplicate Details */}
+                                            {bulkUploadResult.duplicates && bulkUploadResult.duplicates.length > 0 && (
+                                                <details className="mt-4 group">
+                                                    <summary className="cursor-pointer bg-amber-100 hover:bg-amber-200 border border-amber-300 rounded-lg p-3 flex items-center justify-between transition-colors">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-amber-600 text-lg">⚠️</span>
+                                                            <span className="text-amber-800 font-medium text-sm">
+                                                                {bulkUploadResult.duplicates.length} Duplicate(s) Skipped
+                                                            </span>
+                                                        </div>
+                                                        <span className="text-amber-600 text-xs group-open:hidden">Click to view details →</span>
+                                                        <span className="text-amber-600 text-xs hidden group-open:inline">Click to hide ↑</span>
+                                                    </summary>
+                                                    <div className="mt-2 bg-amber-50 border border-amber-200 rounded-lg p-3 max-h-48 overflow-y-auto">
+                                                        <div className="space-y-2">
+                                                            {bulkUploadResult.duplicates.map((dup, idx) => (
+                                                                <div key={idx} className="bg-white rounded-lg p-2 border-l-4 border-amber-400 shadow-sm">
+                                                                    <div className="flex items-start gap-2">
+                                                                        <span className="bg-amber-100 text-amber-800 text-xs font-bold px-2 py-0.5 rounded">
+                                                                            Row {dup.row}
+                                                                        </span>
+                                                                        <span className="text-amber-700 text-sm flex-1">{dup.reason}</span>
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                </details>
+                                            )}
+
+                                            {/* Clickable Validation Error Details */}
+                                            {bulkUploadResult.errors && bulkUploadResult.errors.length > 0 && (
+                                                <details className="mt-4 group">
+                                                    <summary className="cursor-pointer bg-red-100 hover:bg-red-200 border border-red-300 rounded-lg p-3 flex items-center justify-between transition-colors">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-red-600 text-lg">❌</span>
+                                                            <span className="text-red-800 font-medium text-sm">
+                                                                {bulkUploadResult.errors.length} Validation Error(s)
+                                                            </span>
+                                                        </div>
+                                                        <span className="text-red-600 text-xs group-open:hidden">Click to view details →</span>
+                                                        <span className="text-red-600 text-xs hidden group-open:inline">Click to hide ↑</span>
+                                                    </summary>
+                                                    <div className="mt-2 bg-red-50 border border-red-200 rounded-lg p-3 max-h-64 overflow-y-auto">
+                                                        <div className="space-y-3">
+                                                            {bulkUploadResult.errors.map((err, idx) => (
+                                                                <div key={idx} className="bg-white rounded-lg p-3 border-l-4 border-red-400 shadow-sm">
+                                                                    <div className="flex items-center gap-2 mb-2">
+                                                                        <span className="bg-red-100 text-red-800 text-xs font-bold px-2 py-0.5 rounded">
+                                                                            Row {err.row}
+                                                                        </span>
+                                                                        <span className="text-red-400 text-xs">
+                                                                            {err.errors.length} issue(s)
+                                                                        </span>
+                                                                    </div>
+                                                                    <ul className="space-y-1">
+                                                                        {err.errors.map((e, i) => (
+                                                                            <li key={i} className="text-red-700 text-sm flex items-start gap-2">
+                                                                                <span className="text-red-400 mt-0.5">•</span>
+                                                                                <span>{e}</span>
+                                                                            </li>
+                                                                        ))}
+                                                                    </ul>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                </details>
+                                            )}
+
+                                            {/* Technical Error (server error) - also clickable */}
+                                            {bulkUploadResult.error && (
+                                                <details className="mt-4 group">
+                                                    <summary className="cursor-pointer bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-lg p-3 flex items-center justify-between transition-colors">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-gray-600 text-lg">🔧</span>
+                                                            <span className="text-gray-800 font-medium text-sm">
+                                                                Technical Details
+                                                            </span>
+                                                        </div>
+                                                        <span className="text-gray-500 text-xs group-open:hidden">Click to view →</span>
+                                                        <span className="text-gray-500 text-xs hidden group-open:inline">Click to hide ↑</span>
+                                                    </summary>
+                                                    <div className="mt-2 bg-gray-50 border border-gray-200 rounded-lg p-3">
+                                                        <p className="text-xs text-gray-600 font-mono break-all">
+                                                            {bulkUploadResult.error}
+                                                        </p>
+                                                    </div>
+                                                </details>
+                                            )}
+
+                                            {/* Debug: Show raw response when no details available */}
+                                            {!bulkUploadResult.success && !bulkUploadResult.errors?.length && !bulkUploadResult.duplicates?.length && !bulkUploadResult.error && (
+                                                <details className="mt-4 group">
+                                                    <summary className="cursor-pointer bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-lg p-3 flex items-center justify-between transition-colors">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-gray-600 text-lg">📋</span>
+                                                            <span className="text-gray-800 font-medium text-sm">
+                                                                Server Response
+                                                            </span>
+                                                        </div>
+                                                        <span className="text-gray-500 text-xs group-open:hidden">Click to view →</span>
+                                                        <span className="text-gray-500 text-xs hidden group-open:inline">Click to hide ↑</span>
+                                                    </summary>
+                                                    <div className="mt-2 bg-gray-50 border border-gray-200 rounded-lg p-3">
+                                                        <pre className="text-xs text-gray-600 font-mono break-all whitespace-pre-wrap">
+                                                            {JSON.stringify(bulkUploadResult, null, 2)}
+                                                        </pre>
+                                                    </div>
+                                                </details>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Instructions */}
+                            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                                <div className="flex items-start gap-2">
+                                    <AlertCircle size={18} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                                    <div className="text-sm text-amber-800">
+                                        <p className="font-medium mb-1">Important Notes:</p>
+                                        <ul className="list-disc list-inside space-y-1 text-amber-700">
+                                            <li>Fields marked with * in the template are required</li>
+                                            <li>Do not modify the column headers</li>
+                                            <li>Duplicate entries (same phone or business+owner) will be skipped</li>
+                                            <li>Ownership must be exactly "Youth-owned" or "Non youth-owned"</li>
+                                            <li>Status must be "Active", "Pending", or "Inactive"</li>
+                                            <li>Maximum file size: 10MB</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="border-t bg-gray-50 p-4 flex justify-end gap-3">
+                            <button
+                                onClick={closeBulkUploadModal}
+                                className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleBulkUpload}
+                                disabled={!bulkUploadFile || bulkUploadLoading}
+                                className="px-6 py-2 bg-blue-600 text-white rounded-lg font-medium flex items-center gap-2 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            >
+                                {bulkUploadLoading ? (
+                                    <>
+                                        <Loader2 size={18} className="animate-spin" />
+                                        Importing...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Upload size={18} />
+                                        Import Data
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

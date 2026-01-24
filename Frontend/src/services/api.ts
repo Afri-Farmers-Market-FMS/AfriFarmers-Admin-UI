@@ -281,6 +281,82 @@ export const farmerService = {
     const response = await api.get<{ success: boolean; data: DashboardData }>('/dashboard');
     return response.data;
   },
+
+  // Download Excel template for bulk import
+  async downloadTemplate(): Promise<Blob> {
+    console.log('📥 Downloading farmers import template...');
+    const token = getToken();
+    const response = await fetch(`${API_BASE_URL}/farmers/template`, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to download template');
+    }
+    
+    console.log('✅ Template downloaded');
+    return response.blob();
+  },
+
+  // Upload Excel file for bulk import
+  async uploadExcel(file: File): Promise<{
+    success: boolean;
+    message: string;
+    totalRows?: number;
+    importedCount?: number;
+    duplicateCount?: number;
+    errorCount?: number;
+    errors?: { row: number; errors: string[] }[];
+    duplicates?: { row: number; reason: string }[];
+    error?: string;
+  }> {
+    console.log('📤 Uploading Excel file for bulk import...');
+    const token = getToken();
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/farmers/upload-excel`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      const data = await response.json();
+      
+      // Even if response is not ok, return the data if it has detailed error info
+      if (!response.ok) {
+        console.error('❌ Upload failed:', data);
+        // Return the full response data including errors/duplicates for display
+        return {
+          success: false,
+          message: data.message || 'Failed to upload file',
+          totalRows: data.totalRows,
+          importedCount: data.importedCount || 0,
+          duplicateCount: data.duplicateCount || 0,
+          errorCount: data.errorCount || 0,
+          errors: data.errors,
+          duplicates: data.duplicates,
+          error: data.error,
+        };
+      }
+
+      console.log('✅ Upload completed:', data);
+      return data;
+    } catch (err: any) {
+      console.error('❌ Upload exception:', err);
+      return {
+        success: false,
+        message: err.message || 'Network error - failed to upload file',
+        error: err.toString(),
+      };
+    }
+  },
 };
 
 // ============== DASHBOARD SERVICE ==============
