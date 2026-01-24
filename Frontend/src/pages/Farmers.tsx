@@ -9,9 +9,10 @@ import { farmerService } from '../services/api';
 import { Farmer } from '../types';
 import FarmerModal from '../components/FarmerModal';
 import { useAuth } from '../context/AuthContext';
+import * as XLSX from 'xlsx';
 
 // @ts-ignore
-import html2pdf from 'html2pdf.js';
+
 
 const formatDate = (dateStr: string) => {
   if (!dateStr) return 'N/A';
@@ -53,21 +54,74 @@ const Farmers = () => {
     const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
     const [selectedBusiness, setSelectedBusiness] = useState<Farmer | undefined>(undefined);
 
+    // --- Province/District Mapping ---
+    const provinceDistrictMap: Record<string, string[]> = {
+        'Kigali': ['Gasabo', 'Kicukiro', 'Nyarugenge'],
+        'North': ['Burera', 'Gakenke', 'Gicumbi', 'Musanze', 'Rulindo'],
+        'South': ['Gisagara', 'Huye', 'Kamonyi', 'Muhanga', 'Nyamagabe', 'Nyanza', 'Nyaruguru', 'Ruhango'],
+        'West': ['Karongi', 'Ngororero', 'Nyabihu', 'Nyamasheke', 'Rubavu', 'Rusizi', 'Rutsiro'],
+        'East': ['Bugesera', 'Gatsibo', 'Kayonza', 'Kirehe', 'Ngoma', 'Nyagatare', 'Rwamagana']
+    };
+
     // --- Filter State ---
     const [isFilterOpen, setIsFilterOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [filterOwnership, setFilterOwnership] = useState<string>('');
+    const [filterGender, setFilterGender] = useState<string>('');
+    const [filterProvince, setFilterProvince] = useState<string>('');
     const [filterDistrict, setFilterDistrict] = useState<string>('');
     const [filterBusinessType, setFilterBusinessType] = useState<string>('');
     const [filterSize, setFilterSize] = useState<string>('');
     const [filterEducation, setFilterEducation] = useState<string>('');
     const [filterDisability, setFilterDisability] = useState<string>('');
-    const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
-    const [sortField, setSortField] = useState<'date' | 'name' | 'revenue' | 'district' | 'employees'>('date');
+    const [filterIncomeMin, setFilterIncomeMin] = useState<string>('');
+    const [filterIncomeMax, setFilterIncomeMax] = useState<string>('');
+    const [filterAgeMin, setFilterAgeMin] = useState<string>('');
+    const [filterAgeMax, setFilterAgeMax] = useState<string>('');
+
+    // --- Multi-Sort State ---
+    type SortFieldType = 'businessName' | 'ownerName' | 'ownerAge' | 'date' | 'employees' | 'femaleEmployees' | 'youthEmployees' | 'permanentEmployees';
+    interface SortItem { field: SortFieldType; order: 'asc' | 'desc' }
+    const [sortItems, setSortItems] = useState<SortItem[]>([{ field: 'date', order: 'desc' }]);
+
     const [viewMode, setViewMode] = useState<'summary' | 'detailed'>('summary');
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState<number>(10);
     const [visibleNids, setVisibleNids] = useState<Record<string, boolean>>({});
+
+    // --- Derived Districts based on Province ---
+    const availableDistricts = useMemo(() => {
+        if (!filterProvince) return [];
+        return provinceDistrictMap[filterProvince] || [];
+    }, [filterProvince]);
+
+    // Reset district when province changes
+    useEffect(() => {
+        if (filterProvince && !availableDistricts.includes(filterDistrict)) {
+            setFilterDistrict('');
+        }
+    }, [filterProvince, availableDistricts]);
+
+    // --- Multi-Sort Helpers ---
+    const addSortItem = () => {
+        if (sortItems.length < 8) {
+            const usedFields = sortItems.map(s => s.field);
+            const allFields: SortFieldType[] = ['businessName', 'ownerName', 'ownerAge', 'date', 'employees', 'femaleEmployees', 'youthEmployees', 'permanentEmployees'];
+            const nextField = allFields.find(f => !usedFields.includes(f)) || 'date';
+            setSortItems([...sortItems, { field: nextField, order: 'asc' }]);
+        }
+    };
+    const removeSortItem = (index: number) => {
+        if (sortItems.length > 1) {
+            setSortItems(sortItems.filter((_, i) => i !== index));
+        }
+    };
+    const updateSortItem = (index: number, field: SortFieldType | null, order: 'asc' | 'desc' | null) => {
+        const updated = [...sortItems];
+        if (field !== null) updated[index].field = field;
+        if (order !== null) updated[index].order = order;
+        setSortItems(updated);
+    };
 
     // --- Bulk Upload State ---
     const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
@@ -138,55 +192,97 @@ const Farmers = () => {
 
         // 2. Filters
         if (filterOwnership) result = result.filter(b => b.ownership === filterOwnership);
+        if (filterGender) result = result.filter(b => b.gender === filterGender);
+        if (filterProvince) result = result.filter(b => b.province === filterProvince);
         if (filterDistrict) result = result.filter(b => b.district === filterDistrict);
         if (filterBusinessType) result = result.filter(b => b.businessType === filterBusinessType);
         if (filterSize) result = result.filter(b => b.businessSize === filterSize);
         if (filterEducation) result = result.filter(b => b.educationLevel === filterEducation);
         if (filterDisability) result = result.filter(b => b.disabilityStatus === filterDisability);
-
-        // 3. Sort
-        result.sort((a, b) => {
-            let valA: any = 0;
-            let valB: any = 0;
-
-            switch(sortField) {
-                case 'name':
-                    valA = a.businessName?.toLowerCase() || '';
-                    valB = b.businessName?.toLowerCase() || '';
-                    break;
-                case 'district':
-                    valA = a.district?.toLowerCase() || '';
-                    valB = b.district?.toLowerCase() || '';
-                    break;
-                case 'employees':
-                    valA = a.employees || 0;
-                    valB = b.employees || 0;
-                    break;
-                case 'revenue':
-                     const rank = (s: string) => {
-                         if(!s) return 0;
-                         if(s.startsWith('<')) return 1;
-                         if(s.startsWith('840k')) return 2;
-                         if(s.startsWith('1.2M')) return 3;
-                         if(s.startsWith('2.4M')) return 4;
-                         if(s.startsWith('>')) return 5;
-                         return 0;
-                     };
-                     valA = rank(a.revenue);
-                     valB = rank(b.revenue);
-                     break;
-                default: // date
-                    valA = a.commencementDate ? new Date(a.commencementDate).getTime() : 0;
-                    valB = b.commencementDate ? new Date(b.commencementDate).getTime() : 0;
+        
+        // Income range filter (parse annualIncome as number)
+        if (filterIncomeMin) {
+            const minVal = parseFloat(filterIncomeMin);
+            if (!isNaN(minVal)) {
+                result = result.filter(b => {
+                    const income = parseFloat(String(b.annualIncome || '0').replace(/[^0-9.]/g, ''));
+                    return income >= minVal;
+                });
             }
+        }
+        if (filterIncomeMax) {
+            const maxVal = parseFloat(filterIncomeMax);
+            if (!isNaN(maxVal)) {
+                result = result.filter(b => {
+                    const income = parseFloat(String(b.annualIncome || '0').replace(/[^0-9.]/g, ''));
+                    return income <= maxVal;
+                });
+            }
+        }
+        
+        // Age range filter
+        if (filterAgeMin) {
+            const minAge = parseInt(filterAgeMin);
+            if (!isNaN(minAge)) {
+                result = result.filter(b => (b.ownerAge || 0) >= minAge);
+            }
+        }
+        if (filterAgeMax) {
+            const maxAge = parseInt(filterAgeMax);
+            if (!isNaN(maxAge)) {
+                result = result.filter(b => (b.ownerAge || 0) <= maxAge);
+            }
+        }
 
-            if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
-            if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
+        // 3. Multi-Sort - create a copy to avoid mutating the original
+        result = [...result].sort((a, b) => {
+            for (const sortItem of sortItems) {
+                let valA: any = 0;
+                let valB: any = 0;
+
+                switch(sortItem.field) {
+                    case 'businessName':
+                        valA = a.businessName?.toLowerCase() || '';
+                        valB = b.businessName?.toLowerCase() || '';
+                        break;
+                    case 'ownerName':
+                        valA = a.ownerName?.toLowerCase() || '';
+                        valB = b.ownerName?.toLowerCase() || '';
+                        break;
+                    case 'ownerAge':
+                        valA = a.ownerAge || 0;
+                        valB = b.ownerAge || 0;
+                        break;
+                    case 'employees':
+                        valA = a.employees || 0;
+                        valB = b.employees || 0;
+                        break;
+                    case 'femaleEmployees':
+                        valA = a.femaleEmployees || 0;
+                        valB = b.femaleEmployees || 0;
+                        break;
+                    case 'youthEmployees':
+                        valA = a.youthEmployees || 0;
+                        valB = b.youthEmployees || 0;
+                        break;
+                    case 'permanentEmployees':
+                        valA = a.permanentEmployees ? 1 : 0;
+                        valB = b.permanentEmployees ? 1 : 0;
+                        break;
+                    default: // date
+                        valA = a.commencementDate ? new Date(a.commencementDate).getTime() : 0;
+                        valB = b.commencementDate ? new Date(b.commencementDate).getTime() : 0;
+                }
+
+                if (valA < valB) return sortItem.order === 'asc' ? -1 : 1;
+                if (valA > valB) return sortItem.order === 'asc' ? 1 : -1;
+                // If equal, continue to next sort item
+            }
             return 0;
         });
 
         return result;
-    }, [businesses, searchQuery, filterOwnership, filterDistrict, filterBusinessType, filterSize, filterEducation, filterDisability, sortOrder, sortField]);
+    }, [businesses, searchQuery, filterOwnership, filterGender, filterProvince, filterDistrict, filterBusinessType, filterSize, filterEducation, filterDisability, filterIncomeMin, filterIncomeMax, filterAgeMin, filterAgeMax, sortItems]);
 
     // Pagination
     const paginatedData = useMemo(() => {
@@ -304,154 +400,72 @@ const Farmers = () => {
         }
     };
 
-    const handleExportCSV = () => {
+    const handleExportExcel = () => {
         const revealNid = window.confirm("Security Alert: Do you want to unmask National IDs in the export file?\n\nOK = Unmask (Visible)\nCancel = Keep Masked (***********)");
-        let headers: string[] = [];
-        let rows: any[] = [];
-        const dateStr = new Date().toISOString().split('T')[0];
-
+        
+        let dataToExport: any[] = [];
+        
         if (viewMode === 'detailed') {
-            headers = [
-                "ID,Business Name,Status,TIN,Owner Name,Phone,NID,Gender,Age,Nationality,Education,Disability,Business Type,Participant Type,Ownership,Province,District,Sector,Cell,Village,Business Size,Revenue,Annual Income,Total Employees,Female Employees,Youth Employees,Permanent Employees,Value Chain,Description,Support Received,Date Joined"
-            ];
-            rows = processedData.map(b => [
-                b.id,
-                `"${b.businessName?.replace(/"/g, '""') || ''}"`,
-                `"${b.status || 'Active'}"`,
-                `"${b.tin || ''}"`,
-                `"${b.ownerName?.replace(/"/g, '""') || ''}"`,
-                `"${b.phone || ''}"`,
-                `"${revealNid ? (b.nid || '') : '*************'}"`,
-                `"${b.gender || ''}"`,
-                `"${b.ownerAge || ''}"`,
-                `"${b.nationality || 'Rwandan'}"`,
-                `"${b.educationLevel || ''}"`,
-                `"${b.disabilityStatus || ''}"`,
-                `"${b.businessType || ''}"`,
-                `"${b.participantType || ''}"`,
-                `"${b.ownership || ''}"`,
-                `"${b.province || ''}"`,
-                `"${b.district || ''}"`,
-                `"${b.sector || ''}"`,
-                `"${b.cell || ''}"`,
-                `"${b.village || ''}"`,
-                `"${b.businessSize || ''}"`,
-                `"${b.revenue || ''}"`,
-                `"${b.annualIncome || ''}"`,
-                b.employees || 0,
-                b.femaleEmployees || 0,
-                b.youthEmployees || 0,
-                b.permanentEmployees ? 'Yes' : 'No',
-                `"${b.valueChain || ''}"`,
-                `"${b.companyDescription?.replace(/"/g, '""') || ''}"`,
-                `"${b.supportReceived || ''}"`,
-                `"${b.commencementDate || ''}"`
-            ]);
+             dataToExport = processedData.map(b => ({
+                "ID": b.id,
+                "Business Name": b.businessName,
+                "Status": b.status || 'Active',
+                "TIN": b.tin,
+                "Owner Name": b.ownerName,
+                "Phone": b.phone,
+                "NID": revealNid ? (b.nid || '') : '*************',
+                "Gender": b.gender,
+                "Age": b.ownerAge,
+                "Nationality": b.nationality || 'Rwandan',
+                "Education": b.educationLevel,
+                "Disability": b.disabilityStatus,
+                "Business Type": b.businessType,
+                "Participant Type": b.participantType,
+                "Ownership": b.ownership,
+                "Province": b.province,
+                "District": b.district,
+                "Sector": b.sector,
+                "Cell": b.cell,
+                "Village": b.village,
+                "Business Size": b.businessSize,
+                "Revenue": b.revenue,
+                "Annual Income": b.annualIncome,
+                "Total Employees": b.employees || 0,
+                "Female Employees": b.femaleEmployees || 0,
+                "Youth Employees": b.youthEmployees || 0,
+                "Permanent Employees": b.permanentEmployees ? 'Yes' : 'No',
+                "Value Chain": b.valueChain,
+                "Description": b.companyDescription,
+                "Support Received": b.supportReceived,
+                "Date Joined": b.commencementDate
+            }));
         } else {
-            headers = ["ID,Business Name,TIN,Type,Ownership,District,Province,Revenue,Employees,Date Joined"];
-            rows = processedData.map(b => [
-                b.id,
-                `"${b.businessName?.replace(/"/g, '""') || ''}"`,
-                `"${b.tin || ''}"`,
-                `"${b.businessType || ''}"`,
-                `"${b.ownership || ''}"`,
-                `"${b.district || ''}"`,
-                `"${b.province || ''}"`,
-                `"${b.revenue || ''}"`,
-                b.employees || 0,
-                `"${b.commencementDate || ''}"`
-            ]);
+             dataToExport = processedData.map(b => ({
+                "ID": b.id,
+                "Business Name": b.businessName,
+                "TIN": b.tin,
+                "Type": b.businessType,
+                "Ownership": b.ownership,
+                "District": b.district,
+                "Province": b.province,
+                "Revenue": b.revenue,
+                "Employees": b.employees || 0,
+                "Date Joined": b.commencementDate
+            }));
         }
-        
-        const csvContent = "data:text/csv;charset=utf-8," + [headers, ...rows.map(r => r.join(','))].join('\n');
-        const encodedUri = encodeURI(csvContent);
-        const link = document.createElement("a");
-        link.setAttribute("href", encodedUri);
-        link.setAttribute("download", `afm_businesses_${viewMode}_${dateStr}.csv`);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    };
 
-    const handleDownloadProfile = (e: React.MouseEvent, business: Farmer) => {
-        e.stopPropagation();
-        const revealNid = window.confirm("Security Alert: Include full National ID in PDF?\n\nOK = Visible\nCancel = Masked");
-        
-        // Create a temporary hidden container
-        const element = document.createElement('div');
-        element.innerHTML = `
-            <div style="padding: 40px; font-family: sans-serif; color: #1a202c;">
-                <div style="border-bottom: 2px solid #047857; padding-bottom: 20px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center;">
-                    <div>
-                        <h1 style="font-size: 24px; font-weight: bold; color: #064e3b; margin: 0;">Business Profile</h1>
-                        <p style="color: #64748b; margin: 5px 0 0 0;">Generated from AFM Registry</p>
-                    </div>
-                    <div style="text-align: right;">
-                        <h2 style="font-size: 18px; font-weight: bold; margin: 0;">${business.businessName}</h2>
-                        <div style="margin-top: 5px;">
-                            <span style="background: ${business.status === 'Active' ? '#dcfce7' : '#f1f5f9'}; color: ${business.status === 'Active' ? '#166534' : '#475569'}; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; text-transform: uppercase;">
-                                ${business.status || 'Active'}
-                            </span>
-                        </div>
-                        <p style="color: #64748b; margin: 5px 0 0 0; font-size: 12px;">TIN: ${business.tin}</p>
-                    </div>
-                </div>
+        const dateStr = new Date().toISOString().split('T')[0];
+        const fileName = `farmers_export_${dateStr}.xlsx`;
 
-                <div style="margin-bottom: 30px;">
-                    <h3 style="background: #f0fdf4; color: #065f46; padding: 10px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; font-weight: bold; margin-bottom: 15px;">Identity & Demographics</h3>
-                    <table style="width: 100%; border-collapse: collapse;">
-                        <tr><td style="padding: 8px 0; color: #64748b; width: 40%;">Owner Name:</td><td style="font-weight: 500;">${business.ownerName}</td></tr>
-                        <tr><td style="padding: 8px 0; color: #64748b;">NID:</td><td style="font-weight: 500;">${revealNid ? (business.nid || 'N/A') : '*************'}</td></tr>
-                        <tr><td style="padding: 8px 0; color: #64748b;">Phone:</td><td style="font-weight: 500;">${business.phone}</td></tr>
-                        <tr><td style="padding: 8px 0; color: #64748b;">Gender/Age:</td><td style="font-weight: 500;">${business.gender || '-'} / ${business.ownerAge || '-'}</td></tr>
-                        <tr><td style="padding: 8px 0; color: #64748b;">Education:</td><td style="font-weight: 500;">${business.educationLevel || '-'}</td></tr>
-                        <tr><td style="padding: 8px 0; color: #64748b;">Business Type:</td><td style="font-weight: 500;">${business.businessType}</td></tr>
-                        <tr><td style="padding: 8px 0; color: #64748b;">Participant Type:</td><td style="font-weight: 500;">${business.participantType || '-'}</td></tr>
-                        <tr><td style="padding: 8px 0; color: #64748b;">Ownership:</td><td style="font-weight: 500;">${business.ownership}</td></tr>
-                        <tr><td style="padding: 8px 0; color: #64748b;">Registration Date:</td><td style="font-weight: 500;">${formatDate(business.commencementDate)}</td></tr>
-                    </table>
-                </div>
+        // Create workbook and worksheet
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.json_to_sheet(dataToExport);
 
-                <div style="margin-bottom: 30px;">
-                    <h3 style="background: #f0fdf4; color: #065f46; padding: 10px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; font-weight: bold; margin-bottom: 15px;">Location</h3>
-                    <table style="width: 100%; border-collapse: collapse;">
-                        <tr><td style="padding: 8px 0; color: #64748b; width: 40%;">Province:</td><td style="font-weight: 500;">${business.province}</td></tr>
-                        <tr><td style="padding: 8px 0; color: #64748b;">District:</td><td style="font-weight: 500;">${business.district}</td></tr>
-                        <tr><td style="padding: 8px 0; color: #64748b;">Sector:</td><td style="font-weight: 500;">${business.sector}</td></tr>
-                        <tr><td style="padding: 8px 0; color: #64748b;">Cell:</td><td style="font-weight: 500;">${business.cell}</td></tr>
-                        <tr><td style="padding: 8px 0; color: #64748b;">Village:</td><td style="font-weight: 500;">${business.village}</td></tr>
-                    </table>
-                </div>
+        // Add worksheet to workbook
+        XLSX.utils.book_append_sheet(wb, ws, "Farmers");
 
-                <div style="margin-bottom: 30px;">
-                     <h3 style="background: #f0fdf4; color: #065f46; padding: 10px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; font-weight: bold; margin-bottom: 15px;">Operations & Finance</h3>
-                     <table style="width: 100%; border-collapse: collapse;">
-                        <tr><td style="padding: 8px 0; color: #64748b; width: 40%;">Description:</td><td style="font-weight: 500;">${business.companyDescription || 'N/A'}</td></tr>
-                        <tr><td style="padding: 8px 0; color: #64748b; width: 40%;">Value Chain:</td><td style="font-weight: 500;">${business.valueChain}</td></tr>
-                        <tr><td style="padding: 8px 0; color: #64748b;">Business Size:</td><td style="font-weight: 500;">${business.businessSize}</td></tr>
-                        <tr><td style="padding: 8px 0; color: #64748b;">Annual Revenue:</td><td style="font-weight: 500;">${business.revenue}</td></tr>
-                        <tr><td style="padding: 8px 0; color: #64748b;">Net Income:</td><td style="font-weight: 500;">${business.annualIncome || '-'}</td></tr>
-                        <tr><td style="padding: 8px 0; color: #64748b;">Employees:</td><td style="font-weight: 500;">Total: ${business.employees} (Female: ${business.femaleEmployees || 0}, Youth: ${business.youthEmployees || 0})</td></tr>
-                        <tr><td style="padding: 8px 0; color: #64748b;">Permanent Staff:</td><td style="font-weight: 500;">${business.permanentEmployees ? 'Yes' : 'No'}</td></tr>
-                        <tr><td style="padding: 8px 0; color: #64748b;">Support:</td><td style="font-weight: 500;">${business.supportReceived || 'None'}</td></tr>
-                     </table>
-                </div>
-                
-                <div style="margin-top: 50px; text-align: center; color: #94a3b8; font-size: 12px; border-top: 1px solid #e2e8f0; padding-top: 20px;">
-                    © 2026 AFM Admin System. Confidential Document.
-                </div>
-            </div>
-        `;
-
-        const opt = {
-            margin: 10,
-            filename: `${business.businessName.replace(/ /g, '_')}_profile.pdf`,
-            image: { type: 'jpeg' as const, quality: 0.98 },
-            html2canvas: { scale: 2 },
-            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' as const }
-        };
-
-        html2pdf().set(opt).from(element).save();
+        // Save file
+        XLSX.writeFile(wb, fileName);
     };
 
     // --- Bulk Upload Handlers ---
@@ -550,7 +564,7 @@ const Farmers = () => {
                    <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
                        <Briefcase className="text-green-600" size={20} /> Business Directory
                    </h1>
-                   <p className="text-gray-500 text-xs mt-0.5">{businesses.length} enterprises {!canEdit && <span className="text-amber-600">(Read-only)</span>}</p>
+                   <p className="text-gray-500 text-sm mt-0.5">{businesses.length} enterprises {!canEdit && <span className="text-amber-600">(Read-only)</span>}</p>
                 </div>
                 
                 <div className="flex flex-wrap gap-3 w-full lg:w-auto items-center">
@@ -585,12 +599,12 @@ const Farmers = () => {
                     </div>
 
                     <button 
-                        onClick={handleExportCSV}
+                        onClick={handleExportExcel}
                         className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors border border-transparent ${isViewer ? 'bg-gray-50 text-gray-400 cursor-not-allowed' : 'bg-gray-100 hover:bg-gray-200 text-gray-700 hover:border-gray-300'}`}
-                        title={isViewer ? "Export disabled for viewers" : "Export displayed list to CSV"}
+                        title={isViewer ? "Export disabled for viewers" : "Export displayed list to Excel"}
                         disabled={isViewer}
                     >
-                        <FileSpreadsheet size={18} /> <span className="hidden sm:inline">Export</span>
+                        <FileSpreadsheet size={18} /> <span className="hidden sm:inline">Export Excel</span>
                     </button>
 
                     <button 
@@ -620,112 +634,204 @@ const Farmers = () => {
             <div className="flex flex-1 relative gap-2 items-start">
                 {/* Sidebar Filters - Modern Panel Design */}
                 {isFilterOpen && (
-                    <aside className="w-64 flex-shrink-0 bg-green-900 rounded-r-2xl shadow-2xl overflow-hidden animate-in slide-in-from-left duration-300 text-white flex flex-col z-20 h-[calc(100vh-120px)] border-r border-green-800/50">
-                          <div className="bg-green-950/30 backdrop-blur-sm z-10 p-3 border-b border-green-800/50 flex justify-between items-center shadow-sm">
-                                <h3 className="font-bold text-white flex items-center gap-2 text-base"><Filter size={18}/> Filters</h3>
-                                <button onClick={() => setIsFilterOpen(false)} className="text-green-300 hover:text-white transition-colors p-1 hover:bg-white/10 rounded-full"><X size={20}/></button>
+                      <aside className="w-72 flex-shrink-0 bg-gradient-to-b from-green-900 via-green-900 to-green-950 rounded-r-2xl shadow-2xl overflow-hidden animate-in slide-in-from-left duration-300 text-white flex flex-col z-20 h-[calc(100vh-180px)] border-r border-green-700/30">
+                          <div className="bg-gradient-to-r from-green-800/80 to-green-900/80 backdrop-blur-sm z-10 px-3 py-2 border-b border-green-700/40 flex justify-between items-center shadow-lg">
+                              <div className="flex items-center gap-2">
+                                  <div className="w-6 h-6 rounded-md bg-green-600/30 flex items-center justify-center">
+                                      <Filter size={14} className="text-green-300"/>
+                                  </div>
+                                  <div>
+                                      <h3 className="font-bold text-white text-sm">Filters & Sort</h3>
+                                      <p className="text-[11px] text-green-400">{processedData.length} records found</p>
+                                  </div>
+                              </div>
+                              <button onClick={() => setIsFilterOpen(false)} className="text-green-300 hover:text-white transition-all p-1 hover:bg-white/10 rounded-md hover:rotate-90 duration-200"><X size={18}/></button>
                             </div>
 
-                            <div className="space-y-4 p-4 flex-1 overflow-y-auto sidebar-scrollbar">
-                                {/* Filter Item Helper */}
+                            <div className="space-y-2 p-2 flex-1 overflow-y-auto sidebar-scrollbar">
+                                {/* Filter Dropdowns */}
                                 {[
-                                   { label: 'Ownership', value: filterOwnership, set: setFilterOwnership, options: [
-                                     { value: 'Youth-owned', label: '👤 Youth-owned' },
-                                     { value: 'Non youth-owned', label: '👥 Non youth-owned' }
+                                   { label: 'Ownership Status', value: filterOwnership, set: setFilterOwnership, options: [
+                                     { value: 'Youth-owned', label: 'Youth-owned' },
+                                     { value: 'Non youth-owned', label: 'Non youth-owned' }
                                    ]},
-                                   { label: 'District', value: filterDistrict, set: setFilterDistrict, options: districts.map(d => ({ value: d, label: `📍 ${d}` })) },
-                                   { label: 'Business Type', value: filterBusinessType, set: setFilterBusinessType, options: businessTypes.map(t => ({ value: t, label: `🏢 ${t}` })) },
-                                   { label: 'Size', value: filterSize, set: setFilterSize, options: [
-                                     { value: 'Micro', label: '🔹 Micro (1-10)' },
-                                     { value: 'Small', label: '🔸 Small (11-50)' },
-                                     { value: 'Medium', label: '🔶 Medium (51-250)' },
-                                     { value: 'Large', label: '🔷 Large (250+)' }
+                                   { label: 'Business Type', value: filterBusinessType, set: setFilterBusinessType, options: [
+                                     { value: 'Individual', label: 'Individual' },
+                                     { value: 'Cooperative', label: 'Cooperative' },
+                                     { value: 'Company', label: 'Company' },
+                                     { value: 'NGO', label: 'NGO' },
+                                     { value: 'Group', label: 'Group' },
+                                     { value: 'Other', label: 'Other' }
                                    ]},
-                                   { label: 'Education', value: filterEducation, set: setFilterEducation, options: [
-                                     { value: 'None', label: '📚 None' },
-                                     { value: 'Primary', label: '📖 Primary' },
-                                     { value: 'Secondary', label: '🎒 Secondary' },
-                                     { value: 'Vocational', label: '🔧 Vocational' },
-                                     { value: 'Bachelor', label: '🎓 Bachelor' },
-                                     { value: 'Master', label: '🎓 Master' },
-                                     { value: 'PhD', label: '🎓 PhD' }
+                                   { label: 'Gender', value: filterGender, set: setFilterGender, options: [
+                                     { value: 'Male', label: 'Male' },
+                                     { value: 'Female', label: 'Female' }
                                    ]},
-                                   { label: 'Disability', value: filterDisability, set: setFilterDisability, options: [
-                                     { value: 'None', label: '✓ None' },
-                                     { value: 'Physical', label: '♿ Physical' },
-                                     { value: 'Visual', label: '👁 Visual' },
-                                     { value: 'Hearing', label: '👂 Hearing' },
-                                     { value: 'Mental', label: '🧠 Mental' },
-                                     { value: 'Other', label: '📋 Other' }
+                                   { label: 'Province', value: filterProvince, set: setFilterProvince, options: [
+                                     { value: 'Kigali', label: 'Kigali' },
+                                     { value: 'North', label: 'North' },
+                                     { value: 'South', label: 'South' },
+                                     { value: 'West', label: 'West' },
+                                     { value: 'East', label: 'East' }
                                    ]},
-                                ].map((f, i) => (
-                                   <div key={i}>
-                                      <label className="text-[10px] font-bold text-green-300 uppercase block mb-1.5 tracking-wide flex items-center gap-1">
-                                          <div className="w-1 h-2 bg-green-500 rounded-full"></div> {f.label}
+                                   { label: 'District', value: filterDistrict, set: setFilterDistrict, options: availableDistricts.map(d => ({ value: d, label: d })), disabled: !filterProvince },
+                                   { label: 'Education Level', value: filterEducation, set: setFilterEducation, options: [
+                                     { value: 'None', label: 'None' },
+                                     { value: 'Primary', label: 'Primary' },
+                                     { value: 'Secondary', label: 'Secondary' },
+                                     { value: 'Vocational', label: 'Vocational' },
+                                     { value: 'University', label: 'University' }
+                                   ]},
+                                   { label: 'Disability Status', value: filterDisability, set: setFilterDisability, options: [
+                                     { value: 'None', label: 'None' },
+                                     { value: 'Physical', label: 'Physical' },
+                                     { value: 'Visual', label: 'Visual' },
+                                     { value: 'Hearing', label: 'Hearing' },
+                                     { value: 'Mental', label: 'Mental' },
+                                     { value: 'Other', label: 'Other' }
+                                   ]},
+                                   { label: 'Business Size', value: filterSize, set: setFilterSize, options: [
+                                     { value: 'Micro', label: 'Micro' },
+                                     { value: 'Small', label: 'Small' },
+                                     { value: 'Medium', label: 'Medium' },
+                                     { value: 'Large', label: 'Large' }
+                                   ]},
+                                ].map((f: any, i) => (
+                                   <div key={i} className="group">
+                                      <label className="text-xs font-semibold text-green-300/90 uppercase block mb-0.5 tracking-wider flex items-center gap-1">
+                                          <div className="w-1 h-1 bg-green-400 rounded-full group-hover:bg-green-300 transition-colors"></div> {f.label}
                                       </label>
                                       <select 
-                                        className="w-full text-xs bg-green-800/50 border border-green-700/50 text-white rounded-lg focus:ring-2 focus:ring-green-400 focus:border-transparent placeholder-green-400 py-2 px-2 hover:bg-green-800 transition-colors cursor-pointer" 
+                                        className={`w-full text-sm bg-green-800/40 border border-green-600/30 text-white rounded-lg focus:ring-1 focus:ring-green-400/50 focus:border-green-500 focus:bg-green-800/60 py-1.5 px-2 hover:bg-green-800/60 hover:border-green-500/50 transition-all cursor-pointer ${f.disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
                                         value={f.value} 
                                         onChange={e => f.set(e.target.value)}
+                                        disabled={f.disabled}
                                       >
-                                          <option value="" className="bg-green-900">-- Select {f.label} --</option>
+                                          <option value="" className="bg-green-900">All</option>
                                           {f.options.map((o: any) => (
-                                            <option key={typeof o === 'string' ? o : o.value} value={typeof o === 'string' ? o : o.value} className="bg-green-900">
-                                              {typeof o === 'string' ? o : o.label}
-                                            </option>
+                                            <option key={o.value} value={o.value} className="bg-green-900">{o.label}</option>
                                           ))}
                                       </select>
                                    </div>
                                 ))}
-                                
-                                <div className="pt-4 border-t border-green-800">
-                                  <label className="text-[10px] font-bold text-green-300 uppercase block mb-2 flex items-center gap-1">
-                                      <div className="w-1 h-2 bg-green-500 rounded-full"></div> Sort By
+
+                                {/* Annual Income Range */}
+                                <div className="pt-2 border-t border-green-700/30">
+                                  <label className="text-xs font-semibold text-green-300/90 uppercase block mb-1 tracking-wider flex items-center gap-1">
+                                      <div className="w-1 h-1 bg-green-400 rounded-full"></div> Income Range
                                   </label>
-                                  <select 
-                                    className="w-full text-xs bg-green-800/50 border border-green-700/50 text-white rounded-lg focus:ring-2 focus:ring-green-400 focus:border-transparent py-2 px-2 hover:bg-green-800 transition-colors cursor-pointer mb-2"
-                                    value={sortField}
-                                    onChange={e => setSortField(e.target.value as any)}
-                                  >
-                                    <option value="date" className="bg-green-900">📅 Date Joined</option>
-                                    <option value="name" className="bg-green-900">🔤 Name (A-Z)</option>
-                                    <option value="revenue" className="bg-green-900">💰 Revenue</option>
-                                    <option value="district" className="bg-green-900">📍 Location</option>
-                                    <option value="employees" className="bg-green-900">👥 Employees</option>
-                                  </select>
-                                  
-                                  <div className="flex bg-green-800 p-0.5 rounded-lg">
-                                     <button onClick={() => setSortOrder('asc')} className={`flex-1 py-1.5 text-[10px] font-bold rounded transition-all flex items-center justify-center gap-1 ${sortOrder === 'asc' ? 'bg-green-600 text-white shadow-sm' : 'text-green-300 hover:text-white hover:bg-green-700/50'}`}>
-                                       ↑ Asc
-                                     </button>
-                                     <button onClick={() => setSortOrder('desc')} className={`flex-1 py-1.5 text-[10px] font-bold rounded transition-all flex items-center justify-center gap-1 ${sortOrder === 'desc' ? 'bg-green-600 text-white shadow-sm' : 'text-green-300 hover:text-white hover:bg-green-700/50'}`}>
-                                       ↓ Desc
-                                     </button>
+                                  <div className="flex gap-1.5 items-center">
+                                    <input 
+                                      type="number" 
+                                      placeholder="Min" 
+                                      value={filterIncomeMin}
+                                      onChange={e => setFilterIncomeMin(e.target.value)}
+                                      className="flex-1 text-sm bg-green-800/40 border border-green-600/30 text-white rounded-lg py-1.5 px-2 w-full focus:ring-1 focus:ring-green-400/50 focus:border-green-500 hover:bg-green-800/60 transition-all placeholder-green-500/60"
+                                    />
+                                    <span className="text-green-400/80 text-xs">–</span>
+                                    <input 
+                                      type="number" 
+                                      placeholder="Max" 
+                                      value={filterIncomeMax}
+                                      onChange={e => setFilterIncomeMax(e.target.value)}
+                                      className="flex-1 text-sm bg-green-800/40 border border-green-600/30 text-white rounded-lg py-1.5 px-2 w-full focus:ring-1 focus:ring-green-400/50 focus:border-green-500 hover:bg-green-800/60 transition-all placeholder-green-500/60"
+                                    />
+                                  </div>
+                                </div>
+
+                                {/* Age Range */}
+                                <div>
+                                  <label className="text-xs font-semibold text-green-300/90 uppercase block mb-1 tracking-wider flex items-center gap-1">
+                                      <div className="w-1 h-1 bg-green-400 rounded-full"></div> Age Range
+                                  </label>
+                                  <div className="flex gap-1.5 items-center">
+                                    <input 
+                                      type="number" 
+                                      placeholder="Min" 
+                                      value={filterAgeMin}
+                                      onChange={e => setFilterAgeMin(e.target.value)}
+                                      className="flex-1 text-sm bg-green-800/40 border border-green-600/30 text-white rounded-lg py-1.5 px-2 w-full focus:ring-1 focus:ring-green-400/50 focus:border-green-500 hover:bg-green-800/60 transition-all placeholder-green-500/60"
+                                    />
+                                    <span className="text-green-400/80 text-xs">–</span>
+                                    <input 
+                                      type="number" 
+                                      placeholder="Max" 
+                                      value={filterAgeMax}
+                                      onChange={e => setFilterAgeMax(e.target.value)}
+                                      className="flex-1 text-sm bg-green-800/40 border border-green-600/30 text-white rounded-lg py-1.5 px-2 w-full focus:ring-1 focus:ring-green-400/50 focus:border-green-500 hover:bg-green-800/60 transition-all placeholder-green-500/60"
+                                    />
+                                  </div>
+                                </div>
+                                
+                                {/* Multi-Sort Section */}
+                                <div className="pt-2 border-t border-green-700/30">
+                                  <div className="flex justify-between items-center mb-1.5">
+                                    <label className="text-xs font-semibold text-green-300/90 uppercase tracking-wider flex items-center gap-1">
+                                        <div className="w-1 h-1 bg-green-400 rounded-full"></div> Sort By
+                                    </label>
+                                    {sortItems.length < 8 && (
+                                      <button onClick={addSortItem} className="text-[11px] bg-gradient-to-r from-green-600 to-green-700 hover:from-green-500 hover:to-green-600 text-white px-2 py-0.5 rounded font-bold transition-all">+ Add</button>
+                                    )}
+                                  </div>
+                                  <div className="space-y-1">
+                                    {sortItems.map((item, index) => (
+                                      <div key={index} className="flex gap-1 items-center bg-green-800/30 rounded p-1 border border-green-700/20">
+                                        <span className="text-[11px] text-green-400 font-bold w-3 text-center">{index + 1}.</span>
+                                        <select 
+                                          className="flex-1 text-xs bg-green-800/50 border border-green-600/30 text-white rounded py-1 px-1 cursor-pointer focus:ring-1 focus:ring-green-400/50"
+                                          value={item.field}
+                                          onChange={e => updateSortItem(index, e.target.value as SortFieldType, null)}
+                                        >
+                                          <option value="businessName">Business Name</option>
+                                          <option value="ownerName">Owner Name</option>
+                                          <option value="ownerAge">Owner Age</option>
+                                          <option value="date">Date Joined</option>
+                                          <option value="employees">Employees</option>
+                                          <option value="femaleEmployees">Female Emp.</option>
+                                          <option value="youthEmployees">Youth Emp.</option>
+                                          <option value="permanentEmployees">Permanent Emp.</option>
+                                        </select>
+                                        <button 
+                                          onClick={() => updateSortItem(index, null, item.order === 'asc' ? 'desc' : 'asc')}
+                                          className={`text-[11px] font-bold w-5 h-5 rounded flex items-center justify-center transition-all ${item.order === 'asc' ? 'bg-blue-500 text-white' : 'bg-orange-500 text-white'}`}
+                                          title={item.order === 'asc' ? 'Ascending' : 'Descending'}
+                                        >
+                                          {item.order === 'asc' ? '↑' : '↓'}
+                                        </button>
+                                        {sortItems.length > 1 && (
+                                          <button 
+                                            onClick={() => removeSortItem(index)}
+                                            className="text-red-400 hover:text-red-300 hover:bg-red-500/20 w-5 h-5 rounded flex items-center justify-center transition-all text-[11px] font-bold"
+                                          >×</button>
+                                        )}
+                                      </div>
+                                    ))}
                                   </div>
                                 </div>
                             </div>
                            
-                            <div className="p-3 border-t border-green-800/50 bg-green-950/30 backdrop-blur-sm z-10">
+                            <div className="p-2 border-t border-green-700/30 bg-gradient-to-t from-green-950/50 to-transparent backdrop-blur-sm z-10">
                                 <button 
                                  onClick={() => {
-                                     setFilterOwnership(''); setFilterDistrict(''); setFilterBusinessType(''); 
-                                     setFilterSize(''); setFilterEducation(''); setFilterDisability('');
-                                     setSortField('date'); setSortOrder('desc');
+                                     setFilterOwnership(''); setFilterGender(''); setFilterProvince(''); setFilterDistrict(''); 
+                                     setFilterBusinessType(''); setFilterSize(''); setFilterEducation(''); setFilterDisability('');
+                                     setFilterIncomeMin(''); setFilterIncomeMax(''); setFilterAgeMin(''); setFilterAgeMax('');
+                                     setSortItems([{ field: 'date', order: 'desc' }]);
                                  }}
-                                 className="w-full py-2 text-white/90 text-xs font-bold hover:bg-white/10 rounded-lg border border-white/20 hover:border-white/50 transition-all uppercase tracking-wider active:scale-95"
-                                >Clear All</button>
+                                 className="w-full py-2 text-white/90 text-sm font-bold hover:bg-red-500/20 hover:text-red-300 rounded-lg border border-white/20 hover:border-red-400/50 transition-all uppercase tracking-wider active:scale-[0.98]"
+                                >🔄 Clear All</button>
                             </div>
                         </aside>
                 )}
 
                 {/* Table */}
                 <div className="flex-1 overflow-hidden bg-white border border-gray-200 rounded-lg shadow-sm flex flex-col relative settings-scroll transition-all duration-300">
-                   <div 
-                     ref={tableContainerRef}
-                     className="overflow-auto w-full max-h-[calc(100vh-220px)]"
-                   >
+                                     <div 
+                                         ref={tableContainerRef}
+                                         className="overflow-auto w-full max-h-[calc(100vh-220px)] m-2"
+                                     >
                       <table className="w-full text-left border-collapse min-w-max">
-                         <thead className="bg-gray-50/80 backdrop-blur sticky top-0 z-20 text-[11px] uppercase text-gray-500 font-bold tracking-wider border-b border-gray-200">
+                         <thead className="bg-gray-50/80 backdrop-blur sticky top-0 z-20 text-xs uppercase text-gray-500 font-bold tracking-wider border-b border-gray-200">
                              <tr>
                                  {viewMode === 'detailed' ? (
                                     <>
@@ -781,14 +887,15 @@ const Farmers = () => {
                                  <tr 
                                      key={business.id} 
                                      onClick={() => handleRowClick(business)}
-                                     className={`hover:bg-green-50 cursor-pointer group transition-all duration-200 ${viewMode === 'detailed' ? 'text-sm' : ''}`}
+                                     className={`hover:bg-green-50 cursor-pointer group transition-all duration-200 border-b border-green-100 ${viewMode === 'detailed' ? 'text-sm' : ''}`}
+                                     style={{ boxShadow: '0 1px 0 0 #d1fae5' }}
                                  >
                                     {viewMode === 'detailed' ? (
                                         <>
                                             <td className="px-2 py-1.5 border-r border-gray-50">{business.id}</td>
                                             <td className="px-2 py-1.5 font-semibold text-gray-900 border-r border-gray-50">{highlightText(business.businessName, searchQuery)}</td>
                                             <td className="px-2 py-1.5 border-r border-gray-50">
-                                                <span className={`px-1.5 py-0.5 rounded text-[10px] uppercase font-bold ${business.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+                                                <span className={`px-1.5 py-0.5 rounded text-[11px] uppercase font-bold ${business.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
                                                     {business.status || 'Active'}
                                                 </span>
                                             </td>
@@ -834,11 +941,11 @@ const Farmers = () => {
                                                 {business.crops && business.crops.length > 0 ? (
                                                     <div className="flex flex-wrap gap-1">
                                                         {business.crops.slice(0, 3).map((crop, idx) => (
-                                                            <span key={idx} className="bg-green-50 text-green-700 text-[10px] px-1.5 py-0.5 rounded" title={`${crop.quantity} ${crop.unit}`}>
+                                                            <span key={idx} className="bg-green-50 text-green-700 text-[11px] px-1.5 py-0.5 rounded" title={`${crop.quantity} ${crop.unit}`}>
                                                                 {highlightText(crop.name, searchQuery)}
                                                             </span>
                                                         ))}
-                                                        {business.crops.length > 3 && <span className="text-gray-400 text-[10px]">+{business.crops.length - 3}</span>}
+                                                        {business.crops.length > 3 && <span className="text-gray-400 text-[11px]">+{business.crops.length - 3}</span>}
                                                     </div>
                                                 ) : <span className="text-gray-400">-</span>}
                                             </td>
@@ -849,7 +956,6 @@ const Farmers = () => {
                                                 <div className="flex justify-center gap-1">
                                                     {isViewer && <button onClick={(e) => handleView(e, business)} className="p-1 text-gray-600 hover:bg-gray-100 rounded" title="View Profile"><Eye size={14}/></button>}
                                                     {canEdit && <button onClick={(e) => handleEdit(e, business)} className="p-1 text-blue-600 hover:bg-blue-50 rounded" title="Edit"><Edit size={14}/></button>}
-                                                    {!isViewer && <button onClick={(e) => handleDownloadProfile(e, business)} className="p-1 text-green-600 hover:bg-green-50 rounded" title="Download Profile"><Download size={14}/></button>}
                                                     {canEdit && <button onClick={(e) => handleDelete(e, business.id)} className="p-1 text-red-500 hover:bg-red-50 rounded" title="Delete"><Trash2 size={14}/></button>}
                                                 </div>
                                             </td>
@@ -871,7 +977,7 @@ const Farmers = () => {
                                             </td>
                                             <td className="px-6 py-4">
                                                 <span className="block text-gray-900 font-medium">{business.businessType}</span>
-                                                <span className={`text-[10px] uppercase font-bold px-2 py-1 rounded-full inline-block mt-1.5 ${
+                                                <span className={`text-xs uppercase font-bold px-2 py-1 rounded-full inline-block mt-1.5 ${
                                                     business.ownership === 'Youth-owned' 
                                                     ? 'bg-blue-50 text-blue-600 border border-blue-100' 
                                                     : 'bg-gray-100 text-gray-600 border border-gray-200'
@@ -915,11 +1021,6 @@ const Farmers = () => {
                                                     {isViewer && (
                                                         <button onClick={(e) => handleView(e, business)} className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors shadow-sm border border-transparent hover:border-gray-200" title="View Profile">
                                                             <Eye size={16} />
-                                                        </button>
-                                                    )}
-                                                    {!isViewer && (
-                                                        <button onClick={(e) => handleDownloadProfile(e, business)} className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors shadow-sm border border-transparent hover:border-green-100" title="Download Profile">
-                                                            <Download size={16} />
                                                         </button>
                                                     )}
                                                     {canEdit && (

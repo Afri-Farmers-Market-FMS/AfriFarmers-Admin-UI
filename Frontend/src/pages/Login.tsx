@@ -123,22 +123,7 @@ const Login = () => {
                                     </div>
                                 </div>
 
-                                {/* Connection Status & Demo Hint */}
-                                <div className={`p-3 ${isBackendAvailable ? 'bg-green-50 border-green-100' : 'bg-amber-50 border-amber-100'} border rounded-lg text-xs`}>
-                                   <div className="flex items-center gap-2 mb-2">
-                                     {isBackendAvailable ? (
-                                       <><Wifi size={14} className="text-green-600" /><span className="font-bold text-green-800">Backend Connected</span></>
-                                     ) : (
-                                       <><WifiOff size={14} className="text-amber-600" /><span className="font-bold text-amber-800">Offline Mode</span></>
-                                     )}
-                                   </div>
-                                   <p className="font-bold mb-1 text-gray-700">Login Credentials:</p>
-                                   <ul className="space-y-1 pl-3 list-disc text-gray-600">
-                                     <li><span className="font-semibold">Super Admin:</span> admin@afrifarmers.rw / admin123</li>
-                                     <li><span className="font-semibold">Admin:</span> john@afrifarmers.rw / user123</li>
-                                     <li><span className="font-semibold">Viewer:</span> jane@afrifarmers.rw / viewer123</li>
-                                   </ul>
-                                </div>
+                                                                {/* ...existing code... */}
 
                                 <button 
                                     type="submit" 
