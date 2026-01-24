@@ -820,7 +820,7 @@ router.post(
             console.log(`   ⚠️ Row ${rowNumber} is duplicate of existing DB record`);
             skippedDuplicates.push({
               row: rowNumber,
-              reason: `Exact duplicate found in database (all fields match an existing record)`,
+              reason: `Duplicate record found (exists in database or uploaded file)`,
             });
             continue; // Skip this row
           }
@@ -831,7 +831,7 @@ router.post(
             console.log(`   ⚠️ Row ${rowNumber} is duplicate of another row in file (fingerprint already seen)`);
             skippedDuplicates.push({
               row: rowNumber,
-              reason: `Duplicate row in file (all fields match another row in this file)`,
+              reason: `Duplicate record found (exists in database or uploaded file)`,
             });
             continue; // Skip this row
           }
