@@ -39,7 +39,7 @@ const Header = () => {
                 <div className="flex justify-between items-center h-16">
                     {/* Logo */}
                     <div className="flex items-center gap-3">
-                        <div className="h-12 w-12 rounded-full border-2 border-green-700 bg-white flex items-center justify-center overflow-hidden">
+                        <div className="h-14 w-14 rounded-full border-2 border-green-700 bg-white flex items-center justify-center overflow-hidden shadow-lg">
                             <img src={logo} alt="Afri-Farmers Logo" className="w-full h-full object-cover" />
                         </div>
                         <div>

@@ -11,7 +11,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       <div className="print:hidden sticky top-0 z-50">
         <Header />
       </div>
-      <main className="max-w-7xl w-full mx-auto p-4 md:p-6 print:w-full">
+      <main className="max-w-[1920px] w-full mx-auto px-2 md:px-4 py-3 print:w-full">
         {children}
       </main>
     </div>

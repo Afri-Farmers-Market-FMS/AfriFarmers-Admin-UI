@@ -545,12 +545,12 @@ const Farmers = () => {
             )}
             
             {/* Toolbar */}
-            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6 bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-3 mb-3 bg-white p-3 rounded-xl shadow-sm border border-gray-100">
                 <div>
-                   <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                       <Briefcase className="text-green-600" /> Business Directory
+                   <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                       <Briefcase className="text-green-600" size={20} /> Business Directory
                    </h1>
-                   <p className="text-gray-500 text-sm mt-1">Manage {businesses.length} enterprises {!canEdit && <span className="text-amber-600">(Read-only mode)</span>}</p>
+                   <p className="text-gray-500 text-xs mt-0.5">{businesses.length} enterprises {!canEdit && <span className="text-amber-600">(Read-only)</span>}</p>
                 </div>
                 
                 <div className="flex flex-wrap gap-3 w-full lg:w-auto items-center">
@@ -617,130 +617,166 @@ const Farmers = () => {
                 </div>
             </div>
 
-            <div className="flex flex-1 relative gap-4 items-start">
+            <div className="flex flex-1 relative gap-2 items-start">
                 {/* Sidebar Filters - Modern Panel Design */}
                 {isFilterOpen && (
-                    <aside className="w-72 flex-shrink-0 bg-green-900 rounded-r-2xl shadow-2xl overflow-hidden animate-in slide-in-from-left duration-300 text-white flex flex-col z-20 h-[calc(100vh-140px)] border-r border-green-800/50">
-                          <div className="bg-green-950/30 backdrop-blur-sm z-10 p-5 border-b border-green-800/50 flex justify-between items-center shadow-sm">
-                                <h3 className="font-bold text-white flex items-center gap-2 text-lg"><Filter size={20}/> Refine Results</h3>
-                                <button onClick={() => setIsFilterOpen(false)} className="text-green-300 hover:text-white transition-colors p-1 hover:bg-white/10 rounded-full"><X size={24}/></button>
+                    <aside className="w-64 flex-shrink-0 bg-green-900 rounded-r-2xl shadow-2xl overflow-hidden animate-in slide-in-from-left duration-300 text-white flex flex-col z-20 h-[calc(100vh-120px)] border-r border-green-800/50">
+                          <div className="bg-green-950/30 backdrop-blur-sm z-10 p-3 border-b border-green-800/50 flex justify-between items-center shadow-sm">
+                                <h3 className="font-bold text-white flex items-center gap-2 text-base"><Filter size={18}/> Filters</h3>
+                                <button onClick={() => setIsFilterOpen(false)} className="text-green-300 hover:text-white transition-colors p-1 hover:bg-white/10 rounded-full"><X size={20}/></button>
                             </div>
 
-                            <div className="space-y-6 p-6 flex-1 overflow-y-auto sidebar-scrollbar">
+                            <div className="space-y-4 p-4 flex-1 overflow-y-auto sidebar-scrollbar">
                                 {/* Filter Item Helper */}
                                 {[
-                                   { label: 'Ownership Type', value: filterOwnership, set: setFilterOwnership, options: ['Youth-owned', 'Non youth-owned'] },
-                                   { label: 'District / Region', value: filterDistrict, set: setFilterDistrict, options: districts },
-                                   { label: 'Business Type', value: filterBusinessType, set: setFilterBusinessType, options: businessTypes },
-                                   { label: 'Business Size', value: filterSize, set: setFilterSize, options: ['Micro', 'Small', 'Medium', 'Large'] },
-                                   { label: 'Owner Education', value: filterEducation, set: setFilterEducation, options: ['None', 'Primary', 'Secondary', 'University', 'Vocational'] },
-                                   { label: 'Disability Status', value: filterDisability, set: setFilterDisability, options: ['None', 'Physical', 'Mental', 'Visual', 'Hearing', 'Other'] },
+                                   { label: 'Ownership', value: filterOwnership, set: setFilterOwnership, options: [
+                                     { value: 'Youth-owned', label: '👤 Youth-owned' },
+                                     { value: 'Non youth-owned', label: '👥 Non youth-owned' }
+                                   ]},
+                                   { label: 'District', value: filterDistrict, set: setFilterDistrict, options: districts.map(d => ({ value: d, label: `📍 ${d}` })) },
+                                   { label: 'Business Type', value: filterBusinessType, set: setFilterBusinessType, options: businessTypes.map(t => ({ value: t, label: `🏢 ${t}` })) },
+                                   { label: 'Size', value: filterSize, set: setFilterSize, options: [
+                                     { value: 'Micro', label: '🔹 Micro (1-10)' },
+                                     { value: 'Small', label: '🔸 Small (11-50)' },
+                                     { value: 'Medium', label: '🔶 Medium (51-250)' },
+                                     { value: 'Large', label: '🔷 Large (250+)' }
+                                   ]},
+                                   { label: 'Education', value: filterEducation, set: setFilterEducation, options: [
+                                     { value: 'None', label: '📚 None' },
+                                     { value: 'Primary', label: '📖 Primary' },
+                                     { value: 'Secondary', label: '🎒 Secondary' },
+                                     { value: 'Vocational', label: '🔧 Vocational' },
+                                     { value: 'Bachelor', label: '🎓 Bachelor' },
+                                     { value: 'Master', label: '🎓 Master' },
+                                     { value: 'PhD', label: '🎓 PhD' }
+                                   ]},
+                                   { label: 'Disability', value: filterDisability, set: setFilterDisability, options: [
+                                     { value: 'None', label: '✓ None' },
+                                     { value: 'Physical', label: '♿ Physical' },
+                                     { value: 'Visual', label: '👁 Visual' },
+                                     { value: 'Hearing', label: '👂 Hearing' },
+                                     { value: 'Mental', label: '🧠 Mental' },
+                                     { value: 'Other', label: '📋 Other' }
+                                   ]},
                                 ].map((f, i) => (
                                    <div key={i}>
-                                      <label className="text-xs font-bold text-green-300 uppercase block mb-2 tracking-wide flex items-center gap-2">
-                                          <div className="w-1 h-3 bg-green-500 rounded-full"></div> {f.label}
+                                      <label className="text-[10px] font-bold text-green-300 uppercase block mb-1.5 tracking-wide flex items-center gap-1">
+                                          <div className="w-1 h-2 bg-green-500 rounded-full"></div> {f.label}
                                       </label>
                                       <select 
-                                        className="w-full text-sm bg-green-800/50 border border-green-700/50 text-white rounded-lg focus:ring-2 focus:ring-green-400 focus:border-transparent placeholder-green-400 py-2.5 px-3 hover:bg-green-800 transition-colors" 
+                                        className="w-full text-xs bg-green-800/50 border border-green-700/50 text-white rounded-lg focus:ring-2 focus:ring-green-400 focus:border-transparent placeholder-green-400 py-2 px-2 hover:bg-green-800 transition-colors cursor-pointer" 
                                         value={f.value} 
                                         onChange={e => f.set(e.target.value)}
                                       >
-                                          <option value="" className="bg-green-900">All Categories</option>
-                                          {f.options.map(o => <option key={o} value={o} className="bg-green-900">{o}</option>)}
+                                          <option value="" className="bg-green-900">-- Select {f.label} --</option>
+                                          {f.options.map((o: any) => (
+                                            <option key={typeof o === 'string' ? o : o.value} value={typeof o === 'string' ? o : o.value} className="bg-green-900">
+                                              {typeof o === 'string' ? o : o.label}
+                                            </option>
+                                          ))}
                                       </select>
                                    </div>
                                 ))}
                                 
-                                <div className="pt-6 border-t border-green-800">
-                                  <label className="text-xs font-bold text-green-300 uppercase block mb-3 flex items-center gap-2">
-                                      <div className="w-1 h-3 bg-green-500 rounded-full"></div> Sort By
+                                <div className="pt-4 border-t border-green-800">
+                                  <label className="text-[10px] font-bold text-green-300 uppercase block mb-2 flex items-center gap-1">
+                                      <div className="w-1 h-2 bg-green-500 rounded-full"></div> Sort By
                                   </label>
-                                  <div className="grid grid-cols-2 gap-2 mb-3">
-                                     <button onClick={() => setSortField('date')} className={`px-3 py-2.5 text-xs font-medium rounded-lg transition-all border ${sortField === 'date' ? 'bg-white text-green-900 border-white shadow-md transform scale-105' : 'bg-transparent text-green-200 border-green-700 hover:border-green-500 hover:bg-green-800'}`}>Date Joined</button>
-                                     <button onClick={() => setSortField('name')} className={`px-3 py-2.5 text-xs font-medium rounded-lg transition-all border ${sortField === 'name' ? 'bg-white text-green-900 border-white shadow-md transform scale-105' : 'bg-transparent text-green-200 border-green-700 hover:border-green-500 hover:bg-green-800'}`}>Name (A-Z)</button>
-                                     <button onClick={() => setSortField('revenue')} className={`px-3 py-2.5 text-xs font-medium rounded-lg transition-all border ${sortField === 'revenue' ? 'bg-white text-green-900 border-white shadow-md transform scale-105' : 'bg-transparent text-green-200 border-green-700 hover:border-green-500 hover:bg-green-800'}`}>Revenue</button>
-                                     <button onClick={() => setSortField('district')} className={`px-3 py-2.5 text-xs font-medium rounded-lg transition-all border ${sortField === 'district' ? 'bg-white text-green-900 border-white shadow-md transform scale-105' : 'bg-transparent text-green-200 border-green-700 hover:border-green-500 hover:bg-green-800'}`}>Location</button>
-                                  </div>
+                                  <select 
+                                    className="w-full text-xs bg-green-800/50 border border-green-700/50 text-white rounded-lg focus:ring-2 focus:ring-green-400 focus:border-transparent py-2 px-2 hover:bg-green-800 transition-colors cursor-pointer mb-2"
+                                    value={sortField}
+                                    onChange={e => setSortField(e.target.value as any)}
+                                  >
+                                    <option value="date" className="bg-green-900">📅 Date Joined</option>
+                                    <option value="name" className="bg-green-900">🔤 Name (A-Z)</option>
+                                    <option value="revenue" className="bg-green-900">💰 Revenue</option>
+                                    <option value="district" className="bg-green-900">📍 Location</option>
+                                    <option value="employees" className="bg-green-900">👥 Employees</option>
+                                  </select>
                                   
-                                  <div className="flex bg-green-800 p-1 rounded-lg">
-                                     <button onClick={() => setSortOrder('asc')} className={`flex-1 py-2 text-xs font-bold rounded transition-all ${sortOrder === 'asc' ? 'bg-green-600 text-white shadow-sm' : 'text-green-300 hover:text-white'}`}>Ascending (A-Z)</button>
-                                     <button onClick={() => setSortOrder('desc')} className={`flex-1 py-2 text-xs font-bold rounded transition-all ${sortOrder === 'desc' ? 'bg-green-600 text-white shadow-sm' : 'text-green-300 hover:text-white'}`}>Descending (Z-A)</button>
+                                  <div className="flex bg-green-800 p-0.5 rounded-lg">
+                                     <button onClick={() => setSortOrder('asc')} className={`flex-1 py-1.5 text-[10px] font-bold rounded transition-all flex items-center justify-center gap-1 ${sortOrder === 'asc' ? 'bg-green-600 text-white shadow-sm' : 'text-green-300 hover:text-white hover:bg-green-700/50'}`}>
+                                       ↑ Asc
+                                     </button>
+                                     <button onClick={() => setSortOrder('desc')} className={`flex-1 py-1.5 text-[10px] font-bold rounded transition-all flex items-center justify-center gap-1 ${sortOrder === 'desc' ? 'bg-green-600 text-white shadow-sm' : 'text-green-300 hover:text-white hover:bg-green-700/50'}`}>
+                                       ↓ Desc
+                                     </button>
                                   </div>
                                 </div>
                             </div>
                            
-                            <div className="p-5 border-t border-green-800/50 bg-green-950/30 backdrop-blur-sm z-10">
+                            <div className="p-3 border-t border-green-800/50 bg-green-950/30 backdrop-blur-sm z-10">
                                 <button 
                                  onClick={() => {
                                      setFilterOwnership(''); setFilterDistrict(''); setFilterBusinessType(''); 
                                      setFilterSize(''); setFilterEducation(''); setFilterDisability('');
                                      setSortField('date'); setSortOrder('desc');
                                  }}
-                                 className="w-full py-3 text-white/90 text-sm font-bold hover:bg-white/10 rounded-xl border border-white/20 hover:border-white/50 transition-all uppercase tracking-wider shadow-sm hover:shadow active:scale-95"
-                                >Clear All Filters</button>
+                                 className="w-full py-2 text-white/90 text-xs font-bold hover:bg-white/10 rounded-lg border border-white/20 hover:border-white/50 transition-all uppercase tracking-wider active:scale-95"
+                                >Clear All</button>
                             </div>
                         </aside>
                 )}
 
                 {/* Table */}
-                <div className="flex-1 overflow-hidden bg-white border border-gray-200 rounded-xl shadow-sm flex flex-col relative settings-scroll transition-all duration-300">
+                <div className="flex-1 overflow-hidden bg-white border border-gray-200 rounded-lg shadow-sm flex flex-col relative settings-scroll transition-all duration-300">
                    <div 
                      ref={tableContainerRef}
-                     className="overflow-auto w-full max-h-[350px] lg:max-h-[450px]"
+                     className="overflow-auto w-full max-h-[calc(100vh-220px)]"
                    >
                       <table className="w-full text-left border-collapse min-w-max">
-                         <thead className="bg-gray-50/80 backdrop-blur sticky top-0 z-20 text-xs uppercase text-gray-500 font-bold tracking-wider border-b border-gray-200">
+                         <thead className="bg-gray-50/80 backdrop-blur sticky top-0 z-20 text-[11px] uppercase text-gray-500 font-bold tracking-wider border-b border-gray-200">
                              <tr>
                                  {viewMode === 'detailed' ? (
                                     <>
-                                        <th className="px-2 py-2 min-w-[50px] whitespace-nowrap">ID</th>
-                                        <th className="px-2 py-2 min-w-[150px] whitespace-nowrap">Business Name</th>
-                                        <th className="px-2 py-2 min-w-[80px] whitespace-nowrap">Status</th>
-                                        <th className="px-2 py-2 min-w-[100px] whitespace-nowrap">TIN</th>
-                                        <th className="px-2 py-2 min-w-[120px] whitespace-nowrap">Owner</th>
-                                        <th className="px-2 py-2 min-w-[100px] whitespace-nowrap">Phone</th>
-                                        <th className="px-2 py-2 min-w-[80px] whitespace-nowrap">NID</th>
-                                        <th className="px-2 py-2 min-w-[60px] whitespace-nowrap">Sex</th>
-                                        <th className="px-2 py-2 min-w-[40px] whitespace-nowrap">Age</th>
-                                        <th className="px-2 py-2 min-w-[80px] whitespace-nowrap">Nationality</th>
-                                        <th className="px-2 py-2 min-w-[100px] whitespace-nowrap">Education</th>
-                                        <th className="px-2 py-2 min-w-[80px] whitespace-nowrap">Disability</th>
-                                        <th className="px-2 py-2 min-w-[120px] whitespace-nowrap">Type</th>
-                                        <th className="px-2 py-2 min-w-[120px] whitespace-nowrap">Participant</th>
-                                        <th className="px-2 py-2 min-w-[100px] whitespace-nowrap">Ownership</th>
-                                        <th className="px-2 py-2 min-w-[80px] whitespace-nowrap">Province</th>
-                                        <th className="px-2 py-2 min-w-[80px] whitespace-nowrap">District</th>
-                                        <th className="px-2 py-2 min-w-[80px] whitespace-nowrap">Sector</th>
-                                        <th className="px-2 py-2 min-w-[80px] whitespace-nowrap">Cell</th>
-                                        <th className="px-2 py-2 min-w-[80px] whitespace-nowrap">Village</th>
-                                        <th className="px-2 py-2 min-w-[80px] whitespace-nowrap">Size</th>
-                                        <th className="px-2 py-2 min-w-[100px] whitespace-nowrap">Revenue</th>
-                                        <th className="px-2 py-2 min-w-[100px] whitespace-nowrap">Income</th>
-                                        <th className="px-2 py-2 min-w-[50px] whitespace-nowrap">Empl.</th>
-                                        <th className="px-2 py-2 min-w-[50px] whitespace-nowrap">F. Emp</th>
-                                        <th className="px-2 py-2 min-w-[50px] whitespace-nowrap">Y. Emp</th>
-                                        <th className="px-2 py-2 min-w-[80px] whitespace-nowrap">Perm. Emp</th>
-                                        <th className="px-2 py-2 min-w-[150px] whitespace-nowrap">Value Chain</th>
-                                        <th className="px-2 py-2 min-w-[180px] whitespace-nowrap">Production & Crops</th>
-                                        <th className="px-2 py-2 min-w-[200px] whitespace-nowrap">Description</th>
-                                        <th className="px-2 py-2 min-w-[100px] whitespace-nowrap">Support</th>
-                                        <th className="px-2 py-2 min-w-[80px] whitespace-nowrap">Joined</th>
-                                        <th className="px-2 py-2 text-right sticky right-0 bg-gray-50/90 backdrop-blur shadow-l min-w-[80px]">Actions</th>
+                                        <th className="px-1.5 py-1.5 min-w-[40px] whitespace-nowrap">ID</th>
+                                        <th className="px-1.5 py-1.5 min-w-[130px] whitespace-nowrap">Business</th>
+                                        <th className="px-1.5 py-1.5 min-w-[60px] whitespace-nowrap">Status</th>
+                                        <th className="px-1.5 py-1.5 min-w-[80px] whitespace-nowrap">TIN</th>
+                                        <th className="px-1.5 py-1.5 min-w-[100px] whitespace-nowrap">Owner</th>
+                                        <th className="px-1.5 py-1.5 min-w-[85px] whitespace-nowrap">Phone</th>
+                                        <th className="px-1.5 py-1.5 min-w-[70px] whitespace-nowrap">NID</th>
+                                        <th className="px-1.5 py-1.5 min-w-[40px] whitespace-nowrap">Sex</th>
+                                        <th className="px-1.5 py-1.5 min-w-[35px] whitespace-nowrap">Age</th>
+                                        <th className="px-1.5 py-1.5 min-w-[70px] whitespace-nowrap">Nation</th>
+                                        <th className="px-1.5 py-1.5 min-w-[80px] whitespace-nowrap">Edu</th>
+                                        <th className="px-1.5 py-1.5 min-w-[70px] whitespace-nowrap">Disab.</th>
+                                        <th className="px-1.5 py-1.5 min-w-[100px] whitespace-nowrap">Type</th>
+                                        <th className="px-1.5 py-1.5 min-w-[100px] whitespace-nowrap">Participant</th>
+                                        <th className="px-1.5 py-1.5 min-w-[85px] whitespace-nowrap">Ownership</th>
+                                        <th className="px-1.5 py-1.5 min-w-[70px] whitespace-nowrap">Province</th>
+                                        <th className="px-1.5 py-1.5 min-w-[70px] whitespace-nowrap">District</th>
+                                        <th className="px-1.5 py-1.5 min-w-[70px] whitespace-nowrap">Sector</th>
+                                        <th className="px-1.5 py-1.5 min-w-[70px] whitespace-nowrap">Cell</th>
+                                        <th className="px-1.5 py-1.5 min-w-[70px] whitespace-nowrap">Village</th>
+                                        <th className="px-1.5 py-1.5 min-w-[60px] whitespace-nowrap">Size</th>
+                                        <th className="px-1.5 py-1.5 min-w-[85px] whitespace-nowrap">Revenue</th>
+                                        <th className="px-1.5 py-1.5 min-w-[85px] whitespace-nowrap">Income</th>
+                                        <th className="px-1.5 py-1.5 min-w-[40px] whitespace-nowrap">Emp</th>
+                                        <th className="px-1.5 py-1.5 min-w-[40px] whitespace-nowrap">F.E</th>
+                                        <th className="px-1.5 py-1.5 min-w-[40px] whitespace-nowrap">Y.E</th>
+                                        <th className="px-1.5 py-1.5 min-w-[60px] whitespace-nowrap">Perm</th>
+                                        <th className="px-1.5 py-1.5 min-w-[120px] whitespace-nowrap">Value Chain</th>
+                                        <th className="px-1.5 py-1.5 min-w-[150px] whitespace-nowrap">Crops</th>
+                                        <th className="px-1.5 py-1.5 min-w-[160px] whitespace-nowrap">Description</th>
+                                        <th className="px-1.5 py-1.5 min-w-[80px] whitespace-nowrap">Support</th>
+                                        <th className="px-1.5 py-1.5 min-w-[70px] whitespace-nowrap">Joined</th>
+                                        <th className="px-1.5 py-1.5 text-right sticky right-0 bg-gray-50/90 backdrop-blur shadow-l min-w-[70px]">Actions</th>
                                     </>
                                  ) : (
                                     <>
-                                        <th className="px-6 py-4">Business Identity</th>
-                                        <th className="px-6 py-4">Type & Ownership</th>
-                                        <th className="px-6 py-4">Location</th>
-                                        <th className="px-6 py-4">Financials</th>
-                                        <th className="px-6 py-4">Production & Crops</th>
-                                        <th className="px-6 py-4">Started</th>
-                                        <th className="px-6 py-4 text-right">Actions</th>
+                                        <th className="px-3 py-2">Business Identity</th>
+                                        <th className="px-3 py-2">Type & Ownership</th>
+                                        <th className="px-3 py-2">Location</th>
+                                        <th className="px-3 py-2">Financials</th>
+                                        <th className="px-3 py-2">Crops</th>
+                                        <th className="px-3 py-2">Started</th>
+                                        <th className="px-3 py-2 text-right">Actions</th>
                                     </>
                                  )}
                              </tr>
                          </thead>
-                         <tbody className="divide-y divide-gray-100 text-sm">
+                         <tbody className="divide-y divide-gray-100 text-xs">
                              {paginatedData.map(business => (
                                  <tr 
                                      key={business.id} 

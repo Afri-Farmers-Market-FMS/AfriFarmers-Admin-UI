@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Sprout, Lock, Mail, ChevronRight, AlertCircle, Eye, EyeOff, Wifi, WifiOff, Shield } from 'lucide-react';
+import { Lock, Mail, ChevronRight, AlertCircle, Eye, EyeOff, Wifi, WifiOff, Shield } from 'lucide-react';
+import logo from '../assets/logo.png';
 
 const Login = () => {
     const [email, setEmail] = useState('');
@@ -67,8 +68,8 @@ const Login = () => {
                 <div className="bg-green-900 p-8 text-center relative overflow-hidden">
                     <div className="absolute top-0 left-0 w-full h-full opacity-10 bg-[url('https://images.unsplash.com/photo-1625246333195-bf466d3a8552?q=80&w=2071&auto=format&fit=crop')] bg-cover bg-center"></div>
                     <div className="relative z-10 flex flex-col items-center">
-                        <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center text-green-700 mb-4 shadow-lg transform rotate-3">
-                            <Sprout size={32} />
+                        <div className="w-20 h-20 bg-white rounded-2xl flex items-center justify-center mb-4 shadow-lg transform rotate-3 overflow-hidden border-2 border-green-700">
+                            <img src={logo} alt="Afri-Farmers Logo" className="w-full h-full object-cover" />
                         </div>
                         <h2 className="text-2xl font-bold text-white">Welcome Back</h2>
                         <p className="text-green-200 text-sm mt-1">Sign in to AFM Administration Portal</p>
