@@ -7,6 +7,12 @@ export interface IUserDocument extends Document {
   password: string;
   role: 'Super Admin' | 'Admin' | 'Viewer';
   avatar?: string;
+  phone?: string;
+  status: 'Active' | 'Inactive';
+  // 2FA fields
+  twoFactorEnabled: boolean;
+  twoFactorSecret?: string;
+  twoFactorTempSecret?: string; // Temporary secret during setup
   createdAt: Date;
   updatedAt: Date;
   comparePassword(candidatePassword: string): Promise<boolean>;
@@ -44,6 +50,28 @@ const UserSchema = new Schema<IUserDocument>(
       type: String,
       default: undefined,
     },
+    phone: {
+      type: String,
+      default: undefined,
+    },
+    status: {
+      type: String,
+      enum: ['Active', 'Inactive'],
+      default: 'Active',
+    },
+    // 2FA fields
+    twoFactorEnabled: {
+      type: Boolean,
+      default: false,
+    },
+    twoFactorSecret: {
+      type: String,
+      select: false, // Don't include in normal queries
+    },
+    twoFactorTempSecret: {
+      type: String,
+      select: false,
+    },
   },
   {
     timestamps: true,
@@ -70,11 +98,11 @@ UserSchema.methods.comparePassword = async function (
   return bcrypt.compare(candidatePassword, this.password);
 };
 
-// Transform output (remove password, __v)
+// Transform output (remove password, __v, sensitive fields)
 UserSchema.set('toJSON', {
   transform: (_doc, ret) => {
     const transformed = { ...ret, id: ret._id };
-    const { _id, __v, password, ...rest } = transformed;
+    const { _id, __v, password, twoFactorSecret, twoFactorTempSecret, ...rest } = transformed;
     return rest;
   },
 });

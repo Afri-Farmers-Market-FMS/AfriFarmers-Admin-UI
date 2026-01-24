@@ -1,79 +1,241 @@
-import { useState } from 'react';
-import { User, Shield, Save, Users, Plus, Trash2, Edit, AlertCircle, Lock, ShieldCheck, Smartphone, X } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { User, Shield, Save, Users, Plus, Trash2, Edit, AlertCircle, Lock, ShieldCheck, Smartphone, X, Loader2, CheckCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-
-interface SystemUser {
-    id: number;
-    name: string;
-    email: string;
-    role: 'Super Admin' | 'Admin' | 'Viewer';
-    status: 'Active' | 'Inactive';
-    twoFactorEnabled?: boolean;
-}
+import { userService, authService, SystemUser } from '../services/api';
 
 const Settings = () => {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const isViewer = user?.role === 'Viewer';
   const canManageUsers = user?.role === 'Super Admin';
   
   const [activeTab, setActiveTab] = useState<'profile' | 'users' | 'security'>('profile');
-  const [currentUserRole] = useState<'Super Admin' | 'Admin'>('Super Admin'); // Simulating logged-in user
+  
+  // Users State
+  const [users, setUsers] = useState<SystemUser[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  
+  // Profile State
+  const [profileData, setProfileData] = useState({
+    name: user?.name || '',
+    email: user?.email || '',
+    phone: user?.phone || ''
+  });
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileSuccess, setProfileSuccess] = useState(false);
 
-  const [users, setUsers] = useState<SystemUser[]>([
-      { id: 1, name: 'John Doe', email: 'super@afrifarmers.com', role: 'Super Admin', status: 'Active', twoFactorEnabled: true },
-      { id: 2, name: 'Jane Smith', email: 'admin@afrifarmers.com', role: 'Admin', status: 'Active', twoFactorEnabled: false },
-      { id: 3, name: 'Guest User', email: 'viewer@afrifarmers.com', role: 'Viewer', status: 'Active', twoFactorEnabled: false },
-  ]);
-
-  const [is2FAEnabled, setIs2FAEnabled] = useState(true);
+  // 2FA State
+  const [is2FAEnabled, setIs2FAEnabled] = useState(user?.twoFactorEnabled || false);
+  const [show2FASetupModal, setShow2FASetupModal] = useState(false);
+  const [show2FADisableModal, setShow2FADisableModal] = useState(false);
+  const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
+  const [twoFactorSecret, setTwoFactorSecret] = useState('');
+  const [verificationCode, setVerificationCode] = useState('');
+  const [disablePassword, setDisablePassword] = useState('');
+  const [twoFactorLoading, setTwoFactorLoading] = useState(false);
+  const [twoFactorError, setTwoFactorError] = useState('');
 
   // --- Modal States ---
   const [showUserModal, setShowUserModal] = useState(false);
   const [editingUser, setEditingUser] = useState<SystemUser | null>(null);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [modalLoading, setModalLoading] = useState(false);
+  const [modalError, setModalError] = useState('');
 
   // --- Form States ---
-  const [formData, setFormData] = useState<{name: string, email: string, role: 'Super Admin' | 'Admin' | 'Viewer', password?: string}>({ name: '', email: '', role: 'Viewer', password: '' });
+  const [formData, setFormData] = useState<{name: string, email: string, role: 'Super Admin' | 'Admin' | 'Viewer', password?: string, status: 'Active' | 'Inactive'}>({ 
+    name: '', email: '', role: 'Viewer', password: '', status: 'Active' 
+  });
   const [passwordData, setPasswordData] = useState({ current: '', new: '', confirm: '' });
 
-  const handleOpenUserModal = (user?: SystemUser) => {
-      if (user) {
-          setEditingUser(user);
-          setFormData({ name: user.name, email: user.email, role: user.role as any, password: '' });
-      } else {
-          setEditingUser(null);
-          setFormData({ name: '', email: '', role: 'Viewer', password: '' });
-      }
-      setShowUserModal(true);
+  // Fetch users on mount
+  useEffect(() => {
+    if (canManageUsers && activeTab === 'users') {
+      fetchUsers();
+    }
+  }, [canManageUsers, activeTab]);
+
+  // Update profile data when user changes
+  useEffect(() => {
+    if (user) {
+      setProfileData({
+        name: user.name || '',
+        email: user.email || '',
+        phone: user.phone || ''
+      });
+      setIs2FAEnabled(user.twoFactorEnabled || false);
+    }
+  }, [user]);
+
+  const fetchUsers = async () => {
+    setUsersLoading(true);
+    try {
+      const data = await userService.getAll();
+      setUsers(data);
+    } catch (error) {
+      console.error('Failed to fetch users:', error);
+    } finally {
+      setUsersLoading(false);
+    }
   };
 
-  const handleSaveUser = (e: React.FormEvent) => {
-      e.preventDefault();
+  const handleOpenUserModal = (userToEdit?: SystemUser) => {
+    setModalError('');
+    if (userToEdit) {
+      setEditingUser(userToEdit);
+      setFormData({ 
+        name: userToEdit.name, 
+        email: userToEdit.email, 
+        role: userToEdit.role as any, 
+        password: '',
+        status: userToEdit.status || 'Active'
+      });
+    } else {
+      setEditingUser(null);
+      setFormData({ name: '', email: '', role: 'Viewer', password: '', status: 'Active' });
+    }
+    setShowUserModal(true);
+  };
+
+  const handleSaveUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setModalLoading(true);
+    setModalError('');
+    
+    try {
       if (editingUser) {
-          // Update
-          setUsers(users.map(u => u.id === editingUser.id ? { ...u, ...formData, role: formData.role as any } : u));
+        // Update existing user
+        const updateData: any = {
+          name: formData.name,
+          email: formData.email,
+          role: formData.role,
+          status: formData.status
+        };
+        if (formData.password) {
+          updateData.password = formData.password;
+        }
+        await userService.update(editingUser._id, updateData);
       } else {
-          // Create
-          setUsers([...users, { ...formData, id: Date.now(), status: 'Active', role: formData.role as any }]);
-      }
-      setShowUserModal(false);
-  };
-
-  const handleDeleteUser = (id: number) => {
-      if(confirm('Are you sure you want to remove this user access?')) {
-          setUsers(users.filter(u => u.id !== id));
-      }
-  };
-
-  const handleChangePassword = (e: React.FormEvent) => {
-      e.preventDefault();
-      if (passwordData.new !== passwordData.confirm) {
-          alert("New passwords do not match");
+        // Create new user
+        if (!formData.password) {
+          setModalError('Password is required for new users');
+          setModalLoading(false);
           return;
+        }
+        await userService.create({
+          name: formData.name,
+          email: formData.email,
+          role: formData.role,
+          password: formData.password,
+          status: formData.status
+        });
       }
-      alert("Password updated successfully!");
+      await fetchUsers();
+      setShowUserModal(false);
+    } catch (error: any) {
+      setModalError(error.message || 'Failed to save user');
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
+  const handleDeleteUser = async (id: string) => {
+    if(confirm('Are you sure you want to remove this user access?')) {
+      try {
+        await userService.delete(id);
+        await fetchUsers();
+      } catch (error: any) {
+        alert(error.message || 'Failed to delete user');
+      }
+    }
+  };
+
+  const handleSaveProfile = async () => {
+    setProfileSaving(true);
+    setProfileSuccess(false);
+    try {
+      await authService.updateProfile(profileData);
+      await refreshUser();
+      setProfileSuccess(true);
+      setTimeout(() => setProfileSuccess(false), 3000);
+    } catch (error: any) {
+      alert(error.message || 'Failed to update profile');
+    } finally {
+      setProfileSaving(false);
+    }
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (passwordData.new !== passwordData.confirm) {
+      setModalError("New passwords do not match");
+      return;
+    }
+    
+    setModalLoading(true);
+    setModalError('');
+    
+    try {
+      await authService.changePassword(passwordData.current, passwordData.new);
       setShowPasswordModal(false);
       setPasswordData({ current: '', new: '', confirm: '' });
+      alert("Password updated successfully!");
+    } catch (error: any) {
+      setModalError(error.message || 'Failed to change password');
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
+  // 2FA Setup
+  const handleSetup2FA = async () => {
+    setTwoFactorLoading(true);
+    setTwoFactorError('');
+    try {
+      const response = await authService.setup2FA();
+      setQrCodeDataUrl(response.qrCodeDataUrl);
+      setTwoFactorSecret(response.secret);
+      setShow2FASetupModal(true);
+    } catch (error: any) {
+      setTwoFactorError(error.message || 'Failed to setup 2FA');
+    } finally {
+      setTwoFactorLoading(false);
+    }
+  };
+
+  const handleVerify2FA = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setTwoFactorLoading(true);
+    setTwoFactorError('');
+    try {
+      await authService.verify2FA(verificationCode);
+      setIs2FAEnabled(true);
+      await refreshUser();
+      setShow2FASetupModal(false);
+      setVerificationCode('');
+      setQrCodeDataUrl('');
+      setTwoFactorSecret('');
+    } catch (error: any) {
+      setTwoFactorError(error.message || 'Invalid verification code');
+    } finally {
+      setTwoFactorLoading(false);
+    }
+  };
+
+  const handleDisable2FA = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setTwoFactorLoading(true);
+    setTwoFactorError('');
+    try {
+      await authService.disable2FA(disablePassword);
+      setIs2FAEnabled(false);
+      await refreshUser();
+      setShow2FADisableModal(false);
+      setDisablePassword('');
+    } catch (error: any) {
+      setTwoFactorError(error.message || 'Failed to disable 2FA');
+    } finally {
+      setTwoFactorLoading(false);
+    }
   };
 
   const menuItems = [
@@ -122,26 +284,26 @@ const Settings = () => {
                     <div className="p-6 space-y-4">
                         <div className="flex items-center gap-4 mb-6">
                             <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-2xl font-bold border-4 border-white shadow-sm">
-                                JD
+                                {user?.name?.split(' ').map(n => n[0]).join('').toUpperCase() || 'U'}
                             </div>
                             <div>
-                                <h4 className="text-xl font-bold text-gray-900">John Doe</h4>
-                                <p className="text-sm text-gray-500">Super Administrator</p>
+                                <h4 className="text-xl font-bold text-gray-900">{user?.name}</h4>
+                                <p className="text-sm text-gray-500">{user?.role}</p>
                             </div>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
                                 <label className="block text-sm font-bold text-gray-700 mb-1">Full Name</label>
-                                <input type="text" defaultValue={user?.name || "John Doe"} className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${isViewer ? 'bg-gray-100 cursor-not-allowed' : ''}`} disabled={isViewer} readOnly={isViewer} />
+                                <input type="text" value={profileData.name} onChange={(e) => setProfileData({...profileData, name: e.target.value})} className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${isViewer ? 'bg-gray-100 cursor-not-allowed' : ''}`} disabled={isViewer} readOnly={isViewer} />
                             </div>
                             <div>
                                 <label className="block text-sm font-bold text-gray-700 mb-1">Email Address</label>
-                                <input type="email" defaultValue={user?.email || "super@afrifarmers.com"} className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${isViewer ? 'bg-gray-100 cursor-not-allowed' : ''}`} disabled={isViewer} readOnly={isViewer} />
+                                <input type="email" value={profileData.email} onChange={(e) => setProfileData({...profileData, email: e.target.value})} className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${isViewer ? 'bg-gray-100 cursor-not-allowed' : ''}`} disabled={isViewer} readOnly={isViewer} />
                             </div>
                             <div>
                                 <label className="block text-sm font-bold text-gray-700 mb-1">Phone Number</label>
-                                <input type="text" defaultValue="+250 788 123 456" className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${isViewer ? 'bg-gray-100 cursor-not-allowed' : ''}`} disabled={isViewer} readOnly={isViewer} />
+                                <input type="text" value={profileData.phone} onChange={(e) => setProfileData({...profileData, phone: e.target.value})} placeholder="+250 788 123 456" className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${isViewer ? 'bg-gray-100 cursor-not-allowed' : ''}`} disabled={isViewer} readOnly={isViewer} />
                             </div>
                             <div>
                                 <label className="block text-sm font-bold text-gray-700 mb-1">System Role</label>
@@ -155,10 +317,15 @@ const Settings = () => {
                             </div>
                         </div>
                     </div>
-                    <div className="px-6 py-4 bg-gray-50 flex justify-end">
+                    <div className="px-6 py-4 bg-gray-50 flex justify-end items-center gap-3">
+                        {profileSuccess && (
+                            <span className="text-green-600 text-sm flex items-center gap-1">
+                                <CheckCircle size={16} /> Profile saved successfully
+                            </span>
+                        )}
                         {!isViewer ? (
-                            <button className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 shadow-sm transition-all focus:ring-4 focus:ring-green-500/20">
-                                <Save size={18} className="mr-2" />
+                            <button onClick={handleSaveProfile} disabled={profileSaving} className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 shadow-sm transition-all focus:ring-4 focus:ring-green-500/20 disabled:opacity-50">
+                                {profileSaving ? <Loader2 size={18} className="mr-2 animate-spin" /> : <Save size={18} className="mr-2" />}
                                 Save Changes
                             </button>
                         ) : (
@@ -202,46 +369,60 @@ const Settings = () => {
                     </div>
 
                     <div className="overflow-x-auto">
+                        {usersLoading ? (
+                            <div className="p-12 text-center">
+                                <Loader2 size={32} className="animate-spin text-green-600 mx-auto" />
+                                <p className="mt-2 text-gray-500">Loading users...</p>
+                            </div>
+                        ) : (
                         <table className="w-full text-left">
                             <thead className="bg-gray-50 text-xs uppercase text-gray-500 font-bold border-b border-gray-200">
                                 <tr>
                                     <th className="px-6 py-3">User</th>
                                     <th className="px-6 py-3">Role</th>
                                     <th className="px-6 py-3">Status</th>
+                                    <th className="px-6 py-3">2FA</th>
                                     <th className="px-6 py-3 text-right">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
-                                {users.map(user => (
-                                    <tr key={user.id} className="hover:bg-gray-50">
+                                {users.filter(u => u._id !== user?.id && u.email !== user?.email).map(u => (
+                                    <tr key={u._id} className="hover:bg-gray-50">
                                         <td className="px-6 py-4">
-                                            <div className="font-bold text-gray-900">{user.name}</div>
-                                            <div className="text-xs text-gray-500">{user.email}</div>
+                                            <div className="font-bold text-gray-900">{u.name}</div>
+                                            <div className="text-xs text-gray-500">{u.email}</div>
                                         </td>
                                         <td className="px-6 py-4">
                                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${
-                                                user.role === 'Super Admin' ? 'bg-purple-100 text-purple-800 border-purple-200' :
-                                                user.role === 'Admin' ? 'bg-blue-100 text-blue-800 border-blue-200' :
+                                                u.role === 'Super Admin' ? 'bg-purple-100 text-purple-800 border-purple-200' :
+                                                u.role === 'Admin' ? 'bg-blue-100 text-blue-800 border-blue-200' :
                                                 'bg-gray-100 text-gray-800 border-gray-200'
                                             }`}>
-                                                {user.role}
+                                                {u.role}
                                             </span>
                                         </td>
                                         <td className="px-6 py-4">
-                                            <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-700">
-                                                <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div> Active
+                                            <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium ${u.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                                <div className={`w-1.5 h-1.5 rounded-full ${u.status === 'Active' ? 'bg-green-500' : 'bg-red-500'}`}></div> {u.status || 'Active'}
                                             </span>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            {u.twoFactorEnabled ? (
+                                                <span className="inline-flex items-center gap-1 text-green-600 text-xs font-medium"><ShieldCheck size={14} /> Enabled</span>
+                                            ) : (
+                                                <span className="text-gray-400 text-xs">Disabled</span>
+                                            )}
                                         </td>
                                         <td className="px-6 py-4 text-right">
                                             <div className="flex justify-end gap-2">
-                                                <button onClick={() => handleOpenUserModal(user)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors" title="Edit Permissions">
+                                                <button onClick={() => handleOpenUserModal(u)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors" title="Edit Permissions">
                                                     <Edit size={16} />
                                                 </button>
                                                 <button 
-                                                    onClick={() => handleDeleteUser(user.id)}
+                                                    onClick={() => handleDeleteUser(u._id)}
                                                     className="p-1.5 text-red-500 hover:bg-red-50 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed" 
                                                     title="Delete User"
-                                                    disabled={user.role === 'Super Admin'}
+                                                    disabled={u.role === 'Super Admin' || u._id === user?.id}
                                                 >
                                                     <Trash2 size={16} />
                                                 </button>
@@ -251,6 +432,7 @@ const Settings = () => {
                                 ))}
                             </tbody>
                         </table>
+                        )}
                     </div>
                 </div>
             )}
@@ -274,7 +456,7 @@ const Settings = () => {
                                     <h4 className="text-base font-bold text-gray-900">Password Management</h4>
                                     <p className="text-sm text-gray-500 mt-1 mb-4">Update your account password regularly to keep your account secure.</p>
                                     {!isViewer ? (
-                                        <button onClick={() => setShowPasswordModal(true)} className="text-sm font-bold text-green-600 hover:text-green-700 border border-green-200 hover:bg-green-50 px-4 py-2 rounded-lg transition-all">Change Password</button>
+                                        <button onClick={() => { setShowPasswordModal(true); setModalError(''); }} className="text-sm font-bold text-green-600 hover:text-green-700 border border-green-200 hover:bg-green-50 px-4 py-2 rounded-lg transition-all">Change Password</button>
                                     ) : (
                                         <span className="text-sm text-gray-400 italic">Password change is disabled for Viewers</span>
                                     )}
@@ -293,23 +475,41 @@ const Settings = () => {
                                                 {is2FAEnabled && <span className="px-2 py-0.5 bg-green-100 text-green-700 text-[10px] uppercase rounded-full">Enabled</span>}
                                             </h4>
                                             <p className="text-sm text-gray-500 mt-1 max-w-lg">
-                                                Add an extra layer of security to your account. When enabled, you'll need to provide a code sent to your mobile phone to access the system.
+                                                Add an extra layer of security to your account. When enabled, you'll need to provide a code from your authenticator app to access the system.
                                             </p>
                                             <div className="mt-2 text-xs text-gray-400 bg-gray-50 p-2 rounded inline-block">
                                                 Requirement: <span className="font-medium text-gray-600">Super Admin</span> & <span className="font-medium text-gray-600">Admin</span> roles only.
                                             </div>
+                                            
+                                            {twoFactorError && (
+                                                <div className="mt-3 text-sm text-red-600 flex items-center gap-1">
+                                                    <AlertCircle size={14} /> {twoFactorError}
+                                                </div>
+                                            )}
+                                            
+                                            {!isViewer && (
+                                                <div className="mt-4">
+                                                    {is2FAEnabled ? (
+                                                        <button 
+                                                            onClick={() => { setShow2FADisableModal(true); setTwoFactorError(''); }}
+                                                            className="text-sm font-bold text-red-600 hover:text-red-700 border border-red-200 hover:bg-red-50 px-4 py-2 rounded-lg transition-all"
+                                                        >
+                                                            Disable 2FA
+                                                        </button>
+                                                    ) : (
+                                                        <button 
+                                                            onClick={handleSetup2FA}
+                                                            disabled={twoFactorLoading}
+                                                            className="text-sm font-bold text-green-600 hover:text-green-700 border border-green-200 hover:bg-green-50 px-4 py-2 rounded-lg transition-all disabled:opacity-50 flex items-center gap-2"
+                                                        >
+                                                            {twoFactorLoading && <Loader2 size={14} className="animate-spin" />}
+                                                            Enable 2FA
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
-                                    
-                                    <label className="relative inline-flex items-center cursor-pointer mt-2">
-                                        <input 
-                                            type="checkbox" 
-                                            checked={is2FAEnabled}
-                                            onChange={() => setIs2FAEnabled(!is2FAEnabled)}
-                                            className="sr-only peer" 
-                                        />
-                                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
-                                    </label>
                                 </div>
                             </div>
                         </div>
@@ -321,8 +521,8 @@ const Settings = () => {
             {/* User Modal */}
             {showUserModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
-                        <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden max-h-[90vh] overflow-y-auto">
+                        <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50 sticky top-0">
                             <h3 className="text-lg font-bold text-gray-900">
                                 {editingUser ? 'Edit User Access' : 'Add New User'}
                             </h3>
@@ -331,6 +531,11 @@ const Settings = () => {
                             </button>
                         </div>
                         <form onSubmit={handleSaveUser} className="p-6 space-y-4">
+                            {modalError && (
+                                <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg flex items-center gap-2 border border-red-100">
+                                    <AlertCircle size={16} /> {modalError}
+                                </div>
+                            )}
                             <div>
                                 <label className="block text-sm font-bold text-gray-700 mb-1">Full Name</label>
                                 <input
@@ -365,6 +570,17 @@ const Settings = () => {
                                     className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all"
                                     placeholder={editingUser ? "Leave blank to keep current" : "Set initial password"}
                                 />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-1">Status</label>
+                                <select
+                                    value={formData.status}
+                                    onChange={e => setFormData({ ...formData, status: e.target.value as 'Active' | 'Inactive' })}
+                                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all"
+                                >
+                                    <option value="Active">Active</option>
+                                    <option value="Inactive">Inactive</option>
+                                </select>
                             </div>
                             <div>
                                 <label className="block text-sm font-bold text-gray-700 mb-1">Assign Role</label>
@@ -404,7 +620,8 @@ const Settings = () => {
                                 <button type="button" onClick={() => setShowUserModal(false)} className="flex-1 px-4 py-2 border border-gray-200 text-gray-600 rounded-lg font-bold hover:bg-gray-50 transition-colors">
                                     Cancel
                                 </button>
-                                <button type="submit" className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 shadow-lg shadow-green-600/20 transition-all">
+                                <button type="submit" disabled={modalLoading} className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 shadow-lg shadow-green-600/20 transition-all disabled:opacity-50 flex items-center justify-center gap-2">
+                                    {modalLoading && <Loader2 size={16} className="animate-spin" />}
                                     {editingUser ? 'Save Changes' : 'Create User'}
                                 </button>
                             </div>
@@ -424,6 +641,11 @@ const Settings = () => {
                             </button>
                         </div>
                         <form onSubmit={handleChangePassword} className="p-6 space-y-4">
+                            {modalError && (
+                                <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg flex items-center gap-2 border border-red-100">
+                                    <AlertCircle size={16} /> {modalError}
+                                </div>
+                            )}
                             <div>
                                 <label className="block text-sm font-bold text-gray-700 mb-1">Current Password</label>
                                 <input
@@ -458,8 +680,131 @@ const Settings = () => {
                                 <button type="button" onClick={() => setShowPasswordModal(false)} className="flex-1 px-4 py-2 border border-gray-200 text-gray-600 rounded-lg font-bold hover:bg-gray-50 transition-colors">
                                     Cancel
                                 </button>
-                                <button type="submit" className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 shadow-lg shadow-green-600/20 transition-all">
+                                <button type="submit" disabled={modalLoading} className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 shadow-lg shadow-green-600/20 transition-all disabled:opacity-50 flex items-center justify-center gap-2">
+                                    {modalLoading && <Loader2 size={16} className="animate-spin" />}
                                     Update Password
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* 2FA Setup Modal */}
+            {show2FASetupModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
+                        <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                            <h3 className="text-lg font-bold text-gray-900">Setup Two-Factor Authentication</h3>
+                            <button onClick={() => { setShow2FASetupModal(false); setVerificationCode(''); setTwoFactorError(''); }} className="text-gray-400 hover:text-gray-600 transition-colors">
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <form onSubmit={handleVerify2FA} className="p-6 space-y-4">
+                            {twoFactorError && (
+                                <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg flex items-center gap-2 border border-red-100">
+                                    <AlertCircle size={16} /> {twoFactorError}
+                                </div>
+                            )}
+                            
+                            <div className="text-center">
+                                <p className="text-sm text-gray-600 mb-4">
+                                    Scan this QR code with your authenticator app (Google Authenticator, Authy, etc.)
+                                </p>
+                                
+                                {qrCodeDataUrl && (
+                                    <div className="inline-block p-4 bg-white border border-gray-200 rounded-lg shadow-sm">
+                                        <img src={qrCodeDataUrl} alt="2FA QR Code" className="w-48 h-48" />
+                                    </div>
+                                )}
+                                
+                                <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                                    <p className="text-xs text-gray-500 mb-1">Or enter this code manually:</p>
+                                    <code className="text-sm font-mono bg-white px-2 py-1 rounded border border-gray-200 select-all">
+                                        {twoFactorSecret}
+                                    </code>
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-1">Verification Code</label>
+                                <p className="text-xs text-gray-500 mb-2">Enter the 6-digit code from your authenticator app to verify setup</p>
+                                <input
+                                    required
+                                    type="text"
+                                    maxLength={6}
+                                    value={verificationCode}
+                                    onChange={e => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                                    className="w-full px-3 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all text-center text-2xl tracking-widest font-mono"
+                                    placeholder="000000"
+                                />
+                            </div>
+                            
+                            <div className="pt-4 flex gap-3">
+                                <button type="button" onClick={() => { setShow2FASetupModal(false); setVerificationCode(''); setTwoFactorError(''); }} className="flex-1 px-4 py-2 border border-gray-200 text-gray-600 rounded-lg font-bold hover:bg-gray-50 transition-colors">
+                                    Cancel
+                                </button>
+                                <button 
+                                    type="submit" 
+                                    disabled={twoFactorLoading || verificationCode.length !== 6}
+                                    className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 shadow-lg shadow-green-600/20 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                                >
+                                    {twoFactorLoading && <Loader2 size={16} className="animate-spin" />}
+                                    Enable 2FA
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* 2FA Disable Modal */}
+            {show2FADisableModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden">
+                        <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                            <h3 className="text-lg font-bold text-gray-900">Disable Two-Factor Authentication</h3>
+                            <button onClick={() => { setShow2FADisableModal(false); setDisablePassword(''); setTwoFactorError(''); }} className="text-gray-400 hover:text-gray-600 transition-colors">
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <form onSubmit={handleDisable2FA} className="p-6 space-y-4">
+                            {twoFactorError && (
+                                <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg flex items-center gap-2 border border-red-100">
+                                    <AlertCircle size={16} /> {twoFactorError}
+                                </div>
+                            )}
+                            
+                            <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                                <p className="text-sm text-amber-800">
+                                    <strong>Warning:</strong> Disabling 2FA will make your account less secure. You'll only need your email and password to log in.
+                                </p>
+                            </div>
+                            
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-1">Confirm Password</label>
+                                <p className="text-xs text-gray-500 mb-2">Enter your password to confirm</p>
+                                <input
+                                    required
+                                    type="password"
+                                    value={disablePassword}
+                                    onChange={e => setDisablePassword(e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all"
+                                    placeholder="Enter your password"
+                                />
+                            </div>
+                            
+                            <div className="pt-4 flex gap-3">
+                                <button type="button" onClick={() => { setShow2FADisableModal(false); setDisablePassword(''); setTwoFactorError(''); }} className="flex-1 px-4 py-2 border border-gray-200 text-gray-600 rounded-lg font-bold hover:bg-gray-50 transition-colors">
+                                    Cancel
+                                </button>
+                                <button 
+                                    type="submit" 
+                                    disabled={twoFactorLoading || !disablePassword}
+                                    className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700 shadow-lg shadow-red-600/20 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                                >
+                                    {twoFactorLoading && <Loader2 size={16} className="animate-spin" />}
+                                    Disable 2FA
                                 </button>
                             </div>
                         </form>

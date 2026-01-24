@@ -7,6 +7,8 @@ interface User {
   email: string;
   role: 'Super Admin' | 'Admin' | 'Viewer';
   avatar?: string;
+  phone?: string;
+  twoFactorEnabled?: boolean;
 }
 
 interface AuthContextType {
@@ -14,8 +16,9 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   isBackendAvailable: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, twoFactorCode?: string) => Promise<{ requiresTwoFactor?: boolean }>;
   logout: () => void;
+  refreshUser: () => Promise<void>;
   error: string | null;
 }
 
@@ -69,8 +72,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     initAuth();
   }, []);
 
-  const login = async (email: string, password: string) => {
-    setIsLoading(true);
+  const refreshUser = async () => {
+    try {
+      const currentUser = await authService.getCurrentUser();
+      if (currentUser) {
+        const userData: User = {
+          id: currentUser.id || currentUser._id,
+          name: currentUser.name,
+          email: currentUser.email,
+          role: currentUser.role,
+          avatar: currentUser.avatar,
+          phone: currentUser.phone,
+          twoFactorEnabled: currentUser.twoFactorEnabled
+        };
+        setUser(userData);
+        localStorage.setItem('afm_user', JSON.stringify(userData));
+      }
+    } catch {
+      // Ignore errors
+    }
+  };
+
+  const login = async (email: string, password: string, twoFactorCode?: string): Promise<{ requiresTwoFactor?: boolean }> => {
+    // Don't set isLoading for the context when doing 2FA - only for full login
+    // This prevents the PublicRoute from re-rendering during 2FA flow
+    if (!twoFactorCode) {
+      // Only show loading for initial login attempt, not for 2FA verification step
+    }
     setError(null);
     
     console.log('🔐 AuthContext.login called with:', email);
@@ -84,18 +112,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (backendConnected) {
         // Login via backend
         console.log('📤 Calling authService.login...');
-        const { user: userData, token } = await authService.login(email, password);
+        const { user: userData, token, requiresTwoFactor } = await authService.login(email, password, twoFactorCode);
+        
+        // If 2FA is required, return early WITHOUT changing context loading state
+        if (requiresTwoFactor) {
+          console.log('🔐 2FA required, returning to login form');
+          return { requiresTwoFactor: true };
+        }
+        
         console.log('📥 Login response - user:', userData, 'token received:', !!token);
         const newUser: User = {
           id: userData.id || userData._id,
           name: userData.name,
           email: userData.email,
           role: userData.role,
-          avatar: userData.avatar
+          avatar: userData.avatar,
+          phone: userData.phone,
+          twoFactorEnabled: userData.twoFactorEnabled
         };
         setUser(newUser);
         localStorage.setItem('afm_user', JSON.stringify(newUser));
         console.log('✅ User saved to state and localStorage');
+        return {};
       } else {
         // Demo mode: allow mock login when backend is down
         // In production, you might want to throw an error instead
@@ -116,12 +154,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(newUser);
         localStorage.setItem('afm_user', JSON.stringify(newUser));
         console.warn('⚠️ Using demo login - backend not available');
+        return {};
       }
     } catch (err: any) {
       setError(err.message || 'Login failed');
       throw err;
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -139,6 +176,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       isBackendAvailable,
       login, 
       logout,
+      refreshUser,
       error
     }}>
       {children}

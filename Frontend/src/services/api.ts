@@ -80,12 +80,25 @@ const api = new ApiClient(API_BASE_URL);
 
 // ============== AUTH SERVICE ==============
 export const authService = {
-  async login(email: string, password: string): Promise<{ user: any; token: string }> {
-    console.log('🔐 Logging in:', email);
-    const response = await api.post<{ success: boolean; user: any; token: string }>(
+  async login(email: string, password: string, twoFactorCode?: string): Promise<{ user: any; token: string; requiresTwoFactor?: boolean }> {
+    console.log('🔐 Logging in:', email, 'with 2FA code:', twoFactorCode ? 'yes' : 'no');
+    const response = await api.post<{ success: boolean; user: any; token: string; requiresTwoFactor?: boolean }>(
       '/auth/login',
-      { email, password }
+      { email, password, twoFactorCode }
     );
+    
+    console.log('🔐 Login response:', { 
+      success: response.success, 
+      requiresTwoFactor: response.requiresTwoFactor,
+      hasUser: !!response.user,
+      hasToken: !!response.token 
+    });
+    
+    // If 2FA is required, return early
+    if (response.requiresTwoFactor) {
+      console.log('🔐 2FA required, returning early');
+      return { user: null, token: '', requiresTwoFactor: true };
+    }
     
     if (response.token) {
       setToken(response.token);
@@ -121,10 +134,101 @@ export const authService = {
     }
   },
 
+  async updateProfile(data: { name?: string; email?: string; phone?: string }): Promise<any> {
+    const response = await api.put<{ success: boolean; user: any }>('/auth/profile', data);
+    return response.user;
+  },
+
+  async changePassword(currentPassword: string, newPassword: string): Promise<void> {
+    await api.put<{ success: boolean; message: string; token: string }>('/auth/password', {
+      currentPassword,
+      newPassword,
+    });
+  },
+
   logout(): void {
     removeToken();
     localStorage.removeItem('afm_user');
     console.log('👋 Logged out');
+  },
+
+  // 2FA Methods
+  async setup2FA(): Promise<{ secret: string; qrCodeDataUrl: string; otpauthUrl: string }> {
+    console.log('🔐 Setting up 2FA...');
+    const response = await api.post<{ success: boolean; data: { secret: string; qrCode: string; otpauthUrl: string } }>('/auth/2fa/setup', {});
+    // Map qrCode to qrCodeDataUrl for frontend compatibility
+    return {
+      secret: response.data.secret,
+      qrCodeDataUrl: response.data.qrCode,
+      otpauthUrl: response.data.otpauthUrl,
+    };
+  },
+
+  async verify2FA(code: string): Promise<void> {
+    console.log('🔐 Verifying 2FA code...');
+    await api.post<{ success: boolean; message: string }>('/auth/2fa/verify', { code });
+  },
+
+  async disable2FA(password: string): Promise<void> {
+    console.log('🔐 Disabling 2FA...');
+    await api.post<{ success: boolean; message: string }>('/auth/2fa/disable', { password });
+  },
+
+  async get2FAStatus(): Promise<boolean> {
+    const response = await api.get<{ success: boolean; data: { enabled: boolean } }>('/auth/2fa/status');
+    return response.data.enabled;
+  },
+};
+
+// ============== USER MANAGEMENT SERVICE ==============
+export interface SystemUser {
+  _id: string;  // MongoDB ID
+  id?: string;  // Transformed ID for compatibility
+  name: string;
+  email: string;
+  role: 'Super Admin' | 'Admin' | 'Viewer';
+  status: 'Active' | 'Inactive';
+  phone?: string;
+  twoFactorEnabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const userService = {
+  async getAll(): Promise<SystemUser[]> {
+    console.log('👥 Fetching all users...');
+    const response = await api.get<{ success: boolean; data: SystemUser[]; count: number }>('/users');
+    // Map id to _id for compatibility
+    const users = (response.data || []).map(u => ({
+      ...u,
+      _id: u.id || u._id,
+    }));
+    console.log(`✅ Loaded ${users.length} users`);
+    return users;
+  },
+
+  async getById(id: string): Promise<SystemUser> {
+    console.log('🔍 Fetching user:', id);
+    const response = await api.get<{ success: boolean; data: SystemUser }>(`/users/${id}`);
+    return { ...response.data, _id: response.data.id || response.data._id };
+  },
+
+  async create(userData: { name: string; email: string; password: string; role: string; status?: string }): Promise<SystemUser> {
+    console.log('➕ Creating user:', userData.email);
+    const response = await api.post<{ success: boolean; data: SystemUser }>('/users', userData);
+    return { ...response.data, _id: response.data.id || response.data._id };
+  },
+
+  async update(id: string, userData: Partial<{ name: string; email: string; password: string; role: string; status: string }>): Promise<SystemUser> {
+    console.log('✏️ Updating user:', id);
+    const response = await api.put<{ success: boolean; data: SystemUser }>(`/users/${id}`, userData);
+    return { ...response.data, _id: response.data.id || response.data._id };
+  },
+
+  async delete(id: string): Promise<void> {
+    console.log('🗑️ Deleting user:', id);
+    await api.delete(`/users/${id}`);
+    console.log('✅ Deleted user:', id);
   },
 };
 

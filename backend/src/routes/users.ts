@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { body, validationResult } from 'express-validator';
 import { User } from '../models';
 import { protect, authorize, AuthRequest } from '../middleware';
+import bcrypt from 'bcryptjs';
 
 const router = Router();
 
@@ -143,6 +144,14 @@ router.put(
       .optional()
       .isIn(['Super Admin', 'Admin', 'Viewer'])
       .withMessage('Invalid role'),
+    body('password')
+      .optional()
+      .isLength({ min: 6 })
+      .withMessage('Password must be at least 6 characters'),
+    body('status')
+      .optional()
+      .isIn(['Active', 'Inactive'])
+      .withMessage('Invalid status'),
   ],
   async (req: AuthRequest, res: Response): Promise<void> => {
     try {
@@ -177,11 +186,18 @@ router.put(
         return;
       }
 
-      const { name, email, role } = req.body;
+      const { name, email, role, password, status } = req.body;
       const updateData: any = {};
       if (name) updateData.name = name;
       if (email) updateData.email = email;
       if (role && isSuperAdmin) updateData.role = role;
+      if (status && isSuperAdmin) updateData.status = status;
+      
+      // Handle password update (needs hashing)
+      if (password && isSuperAdmin) {
+        const salt = await bcrypt.genSalt(12);
+        updateData.password = await bcrypt.hash(password, salt);
+      }
 
       const user = await User.findByIdAndUpdate(req.params.id, updateData, {
         new: true,
