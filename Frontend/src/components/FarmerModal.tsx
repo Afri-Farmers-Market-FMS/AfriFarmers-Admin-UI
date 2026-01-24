@@ -9,9 +9,10 @@ interface FarmerModalProps {
   onSave: (farmer: Omit<Farmer, 'id'> | Farmer) => Promise<void>;
   initialData?: Farmer;
   mode: 'add' | 'edit';
+  readOnly?: boolean;
 }
 
-const FarmerModal = ({ isOpen, onClose, onSave, initialData, mode }: FarmerModalProps) => {
+const FarmerModal = ({ isOpen, onClose, onSave, initialData, mode, readOnly = false }: FarmerModalProps) => {
   const [formData, setFormData] = useState<Partial<Farmer>>({
     businessName: '',
     ownerName: '',
@@ -167,9 +168,9 @@ const FarmerModal = ({ isOpen, onClose, onSave, initialData, mode }: FarmerModal
           <div>
               <h2 className="text-2xl font-bold flex items-center gap-2">
                  {mode === 'add' ? <Plus size={24} /> : <Edit size={24} />}
-                 {mode === 'add' ? 'Register New Business' : 'Edit Business Profile'}
+                 {readOnly ? 'View Business Profile' : (mode === 'add' ? 'Register New Business' : 'Edit Business Profile')}
               </h2>
-              <p className="text-green-200 text-sm mt-1 opacity-90">Complete the information below to update the registry.</p>
+              <p className="text-green-200 text-sm mt-1 opacity-90">{readOnly ? 'You are viewing this profile in read-only mode.' : 'Complete the information below to update the registry.'}</p>
           </div>
           <button onClick={onClose} className="p-2 bg-white/10 hover:bg-white/20 rounded-full transition-colors">
             <X size={24} />
@@ -188,15 +189,15 @@ const FarmerModal = ({ isOpen, onClose, onSave, initialData, mode }: FarmerModal
              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                  <div>
                     <label className="input-label">Business Name <span className="text-red-500">*</span></label>
-                    <input required name="businessName" value={formData.businessName} onChange={handleChange} className="input-field" placeholder="e.g. AGRO LTD" />
+                    <input required name="businessName" value={formData.businessName} onChange={handleChange} className={`input-field ${readOnly ? 'bg-gray-100 cursor-not-allowed' : ''}`} placeholder="e.g. AGRO LTD" disabled={readOnly} readOnly={readOnly} />
                  </div>
                  <div>
                     <label className="input-label">TIN Number</label>
-                    <input name="tin" value={formData.tin} onChange={handleChange} className="input-field" placeholder="9 Digits" />
+                    <input name="tin" value={formData.tin} onChange={handleChange} className={`input-field ${readOnly ? 'bg-gray-100 cursor-not-allowed' : ''}`} placeholder="9 Digits" disabled={readOnly} readOnly={readOnly} />
                  </div>
                  <div>
                     <label className="input-label">Business Type</label>
-                    <select name="businessType" value={formData.businessType} onChange={handleChange} className="input-field">
+                    <select name="businessType" value={formData.businessType} onChange={handleChange} className={`input-field ${readOnly ? 'bg-gray-100 cursor-not-allowed' : ''}`} disabled={readOnly}>
                         <option value="Individual">Individual</option>
                         <option value="Cooperative">Cooperative</option>
                         <option value="Company">Company</option>
@@ -206,19 +207,19 @@ const FarmerModal = ({ isOpen, onClose, onSave, initialData, mode }: FarmerModal
                  </div>
                  <div className="md:col-span-2">
                     <label className="input-label">Description</label>
-                    <textarea name="companyDescription" value={formData.companyDescription} onChange={handleChange} className="input-field min-h-[80px]" placeholder="Brief description of activities..." />
+                    <textarea name="companyDescription" value={formData.companyDescription} onChange={handleChange} className={`input-field min-h-[80px] ${readOnly ? 'bg-gray-100 cursor-not-allowed' : ''}`} placeholder="Brief description of activities..." disabled={readOnly} readOnly={readOnly} />
                  </div>
                  <div>
                      <label className="input-label">Support Received</label>
-                     <input name="supportReceived" value={formData.supportReceived} onChange={handleChange} className="input-field" placeholder="e.g. Training, Grants" />
+                     <input name="supportReceived" value={formData.supportReceived} onChange={handleChange} className={`input-field ${readOnly ? 'bg-gray-100 cursor-not-allowed' : ''}`} placeholder="e.g. Training, Grants" disabled={readOnly} readOnly={readOnly} />
                  </div>
                  <div>
                     <label className="input-label">Commencement Date</label>
-                    <input type="date" name="commencementDate" value={formData.commencementDate} onChange={handleChange} className="input-field" />
+                    <input type="date" name="commencementDate" value={formData.commencementDate} onChange={handleChange} className={`input-field ${readOnly ? 'bg-gray-100 cursor-not-allowed' : ''}`} disabled={readOnly} readOnly={readOnly} />
                  </div>
                  <div>
                     <label className="input-label">Ownership Status</label>
-                    <select name="ownership" value={formData.ownership} onChange={handleChange} className="input-field">
+                    <select name="ownership" value={formData.ownership} onChange={handleChange} className={`input-field ${readOnly ? 'bg-gray-100 cursor-not-allowed' : ''}`} disabled={readOnly}>
                         <option value="Youth-owned">Youth-owned</option>
                         <option value="Non youth-owned">Non youth-owned</option>
                     </select>
@@ -235,30 +236,30 @@ const FarmerModal = ({ isOpen, onClose, onSave, initialData, mode }: FarmerModal
              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                  <div className="md:col-span-2">
                     <label className="input-label">Owner Name <span className="text-red-500">*</span></label>
-                    <input required name="ownerName" value={formData.ownerName} onChange={handleChange} className="input-field" />
+                    <input required name="ownerName" value={formData.ownerName} onChange={handleChange} className={`input-field ${readOnly ? 'bg-gray-100 cursor-not-allowed' : ''}`} disabled={readOnly} readOnly={readOnly} />
                  </div>
                  <div>
                     <label className="input-label">National ID</label>
-                    <input name="nid" value={formData.nid} onChange={handleChange} className="input-field" placeholder="16 Digits" />
+                    <input name="nid" value={readOnly ? '****************' : formData.nid} onChange={handleChange} className={`input-field ${readOnly ? 'bg-gray-100 cursor-not-allowed' : ''}`} placeholder="16 Digits" disabled={readOnly} readOnly={readOnly} />
                  </div>
                  <div>
                     <label className="input-label">Phone</label>
-                    <input required name="phone" value={formData.phone} onChange={handleChange} className="input-field" />
+                    <input required name="phone" value={formData.phone} onChange={handleChange} className={`input-field ${readOnly ? 'bg-gray-100 cursor-not-allowed' : ''}`} disabled={readOnly} readOnly={readOnly} />
                  </div>
                  <div>
                     <label className="input-label">Age</label>
-                    <input type="number" name="ownerAge" value={formData.ownerAge} onChange={handleChange} className="input-field" />
+                    <input type="number" name="ownerAge" value={formData.ownerAge} onChange={handleChange} className={`input-field ${readOnly ? 'bg-gray-100 cursor-not-allowed' : ''}`} disabled={readOnly} readOnly={readOnly} />
                  </div>
                  <div>
                     <label className="input-label">Gender</label>
-                     <select name="gender" value={formData.gender} onChange={handleChange} className="input-field">
+                     <select name="gender" value={formData.gender} onChange={handleChange} className={`input-field ${readOnly ? 'bg-gray-100 cursor-not-allowed' : ''}`} disabled={readOnly}>
                         <option value="Male">Male</option>
                         <option value="Female">Female</option>
                     </select>
                  </div>
                  <div>
                     <label className="input-label">Education Level</label>
-                    <select name="educationLevel" value={formData.educationLevel} onChange={handleChange} className="input-field">
+                    <select name="educationLevel" value={formData.educationLevel} onChange={handleChange} className={`input-field ${readOnly ? 'bg-gray-100 cursor-not-allowed' : ''}`} disabled={readOnly}>
                         <option value="None">None</option>
                         <option value="Primary">Primary</option>
                         <option value="Secondary">Secondary</option>
@@ -268,7 +269,7 @@ const FarmerModal = ({ isOpen, onClose, onSave, initialData, mode }: FarmerModal
                  </div>
                  <div>
                     <label className="input-label">Disability Status</label>
-                    <select name="disabilityStatus" value={formData.disabilityStatus} onChange={handleChange} className="input-field">
+                    <select name="disabilityStatus" value={formData.disabilityStatus} onChange={handleChange} className={`input-field ${readOnly ? 'bg-gray-100 cursor-not-allowed' : ''}`} disabled={readOnly}>
                         <option value="None">None</option>
                         <option value="Physical">Physical</option>
                         <option value="Visual">Visual</option>
@@ -289,7 +290,7 @@ const FarmerModal = ({ isOpen, onClose, onSave, initialData, mode }: FarmerModal
              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                  <div>
                     <label className="input-label">Province</label>
-                    <select name="province" value={formData.province} onChange={handleChange} className="input-field">
+                    <select name="province" value={formData.province} onChange={handleChange} className={`input-field ${readOnly ? 'bg-gray-100 cursor-not-allowed' : ''}`} disabled={readOnly}>
                         <option value="">Select...</option>
                         <option value="Kigali">Kigali</option>
                         <option value="North">North</option>
@@ -300,19 +301,19 @@ const FarmerModal = ({ isOpen, onClose, onSave, initialData, mode }: FarmerModal
                  </div>
                  <div>
                     <label className="input-label">District</label>
-                    <input name="district" value={formData.district} onChange={handleChange} className="input-field" />
+                    <input name="district" value={formData.district} onChange={handleChange} className={`input-field ${readOnly ? 'bg-gray-100 cursor-not-allowed' : ''}`} disabled={readOnly} readOnly={readOnly} />
                  </div>
                  <div>
                     <label className="input-label">Sector</label>
-                    <input name="sector" value={formData.sector} onChange={handleChange} className="input-field" />
+                    <input name="sector" value={formData.sector} onChange={handleChange} className={`input-field ${readOnly ? 'bg-gray-100 cursor-not-allowed' : ''}`} disabled={readOnly} readOnly={readOnly} />
                  </div>
                  <div>
                     <label className="input-label">Cell</label>
-                    <input name="cell" value={formData.cell} onChange={handleChange} className="input-field" />
+                    <input name="cell" value={formData.cell} onChange={handleChange} className={`input-field ${readOnly ? 'bg-gray-100 cursor-not-allowed' : ''}`} disabled={readOnly} readOnly={readOnly} />
                  </div>
                  <div>
                     <label className="input-label">Village</label>
-                    <input name="village" value={formData.village} onChange={handleChange} className="input-field" />
+                    <input name="village" value={formData.village} onChange={handleChange} className={`input-field ${readOnly ? 'bg-gray-100 cursor-not-allowed' : ''}`} disabled={readOnly} readOnly={readOnly} />
                  </div>
              </div>
           </section>
@@ -326,7 +327,7 @@ const FarmerModal = ({ isOpen, onClose, onSave, initialData, mode }: FarmerModal
              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                  <div>
                     <label className="input-label">Business Size</label>
-                    <select name="businessSize" value={formData.businessSize} onChange={handleChange} className="input-field">
+                    <select name="businessSize" value={formData.businessSize} onChange={handleChange} className={`input-field ${readOnly ? 'bg-gray-100 cursor-not-allowed' : ''}`} disabled={readOnly}>
                         <option value="Micro">Micro</option>
                         <option value="Small">Small</option>
                         <option value="Medium">Medium</option>
@@ -335,7 +336,7 @@ const FarmerModal = ({ isOpen, onClose, onSave, initialData, mode }: FarmerModal
                  </div>
                  <div>
                     <label className="input-label">Annual Revenue (Range)</label>
-                    <select name="revenue" value={formData.revenue} onChange={handleChange} className="input-field">
+                    <select name="revenue" value={formData.revenue} onChange={handleChange} className={`input-field ${readOnly ? 'bg-gray-100 cursor-not-allowed' : ''}`} disabled={readOnly}>
                         <option value="">Select...</option>
                         <option value="< 840,000 RWF">&lt; 840,000 RWF</option>
                         <option value="840k - 1.2M RWF">840k - 1.2M RWF</option>
@@ -346,7 +347,7 @@ const FarmerModal = ({ isOpen, onClose, onSave, initialData, mode }: FarmerModal
                  </div>
                  <div>
                     <label className="input-label">Annual Income</label>
-                    <input name="annualIncome" value={formData.annualIncome} onChange={handleChange} className="input-field" placeholder="Exact amount if known" />
+                    <input name="annualIncome" value={formData.annualIncome} onChange={handleChange} className={`input-field ${readOnly ? 'bg-gray-100 cursor-not-allowed' : ''}`} placeholder="Exact amount if known" disabled={readOnly} readOnly={readOnly} />
                  </div>
                  
                  <div className="md:col-span-3 bg-gray-50/50 p-4 rounded-lg border border-gray-200 mt-2">
@@ -354,22 +355,22 @@ const FarmerModal = ({ isOpen, onClose, onSave, initialData, mode }: FarmerModal
                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
                             <label className="input-label">Total Employees</label>
-                            <input type="number" name="employees" value={formData.employees} onChange={handleChange} className="input-field" />
+                            <input type="number" name="employees" value={formData.employees} onChange={handleChange} className={`input-field ${readOnly ? 'bg-gray-100 cursor-not-allowed' : ''}`} disabled={readOnly} readOnly={readOnly} />
                         </div>
                         <div>
                             <label className="input-label text-pink-600">Female Employees</label>
-                            <input type="number" name="femaleEmployees" value={formData.femaleEmployees} onChange={handleChange} className="input-field focus:ring-pink-500 hover:border-pink-200" />
+                            <input type="number" name="femaleEmployees" value={formData.femaleEmployees} onChange={handleChange} className={`input-field ${readOnly ? 'bg-gray-100 cursor-not-allowed' : ''}`} disabled={readOnly} readOnly={readOnly} />
                         </div>
                          <div>
                             <label className="input-label text-blue-600">Youth Employees</label>
-                            <input type="number" name="youthEmployees" value={formData.youthEmployees} onChange={handleChange} className="input-field focus:ring-blue-500 hover:border-blue-200" />
+                            <input type="number" name="youthEmployees" value={formData.youthEmployees} onChange={handleChange} className={`input-field ${readOnly ? 'bg-gray-100 cursor-not-allowed' : ''}`} disabled={readOnly} readOnly={readOnly} />
                         </div>
                      </div>
                  </div>
                  
                  <div className="md:col-span-3">
                     <label className="input-label">Value Chain Activities</label>
-                    <input name="valueChain" value={formData.valueChain} onChange={handleChange} className="input-field" placeholder="Main value chain activities..." />
+                    <input name="valueChain" value={formData.valueChain} onChange={handleChange} className={`input-field ${readOnly ? 'bg-gray-100 cursor-not-allowed' : ''}`} placeholder="Main value chain activities..." disabled={readOnly} readOnly={readOnly} />
                  </div>
              </div>
           </section>
@@ -382,7 +383,8 @@ const FarmerModal = ({ isOpen, onClose, onSave, initialData, mode }: FarmerModal
              </h3>
              
              <div className="space-y-4">
-               {/* Add New Crop */}
+               {/* Add New Crop - only show for editors */}
+               {!readOnly && (
                <div className="bg-yellow-50/50 p-4 rounded-lg border border-yellow-100">
                   <label className="text-xs font-bold text-yellow-800 uppercase tracking-wider mb-3 block">Add Production Record</label>
                   <div className="flex gap-2">
@@ -414,6 +416,7 @@ const FarmerModal = ({ isOpen, onClose, onSave, initialData, mode }: FarmerModal
                       </button>
                   </div>
                </div>
+               )}
 
                {/* List Crops */}
                {formData.crops && formData.crops.length > 0 ? (
@@ -423,7 +426,7 @@ const FarmerModal = ({ isOpen, onClose, onSave, initialData, mode }: FarmerModal
                           <tr>
                              <th className="px-4 py-3">Item</th>
                              <th className="px-4 py-3">Quantity</th>
-                             <th className="px-4 py-3 text-right">Action</th>
+                             {!readOnly && <th className="px-4 py-3 text-right">Action</th>}
                           </tr>
                        </thead>
                        <tbody className="divide-y divide-gray-100 bg-white">
@@ -431,11 +434,13 @@ const FarmerModal = ({ isOpen, onClose, onSave, initialData, mode }: FarmerModal
                              <tr key={crop.id} className="hover:bg-gray-50 transition-colors">
                                 <td className="px-4 py-3 font-medium text-gray-900">{crop.name}</td>
                                 <td className="px-4 py-3 text-gray-600 font-mono">{crop.quantity} {crop.unit}</td>
+                                {!readOnly && (
                                 <td className="px-4 py-3 text-right">
                                    <button type="button" onClick={() => removeCrop(crop.id)} className="text-gray-400 hover:text-red-600 transition-colors p-1 rounded hover:bg-red-50">
                                       <Trash2 size={16} />
                                    </button>
                                 </td>
+                                )}
                              </tr>
                           ))}
                        </tbody>
@@ -455,8 +460,9 @@ const FarmerModal = ({ isOpen, onClose, onSave, initialData, mode }: FarmerModal
         {/* Footer */}
         <div className="p-6 border-t border-gray-100 bg-white flex justify-end gap-4 shrink-0 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-10">
             <button type="button" onClick={onClose} className="px-6 py-2.5 text-sm font-bold text-gray-600 hover:text-gray-900 border border-transparent hover:bg-gray-50 rounded-lg transition-colors">
-                Cancel
+                {readOnly ? 'Close' : 'Cancel'}
             </button>
+            {!readOnly && (
             <button 
                 onClick={handleSubmit} 
                 disabled={loading}
@@ -471,6 +477,7 @@ const FarmerModal = ({ isOpen, onClose, onSave, initialData, mode }: FarmerModal
                     </>
                 )}
             </button>
+            )}
         </div>
       </div>
       

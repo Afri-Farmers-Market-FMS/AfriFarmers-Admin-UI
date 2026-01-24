@@ -5,12 +5,16 @@ import { farmerService } from '../services/api';
 import { DashboardData, Farmer } from '../types';
 import { Link } from 'react-router-dom';
 import FarmerModal from '../components/FarmerModal';
+import { useAuth } from '../context/AuthContext';
 // @ts-ignore
 import html2pdf from 'html2pdf.js';
 
 const Dashboard = () => {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+  const canEdit = user?.role === 'Super Admin' || user?.role === 'Admin';
+  const isViewer = user?.role === 'Viewer';
   
   // Modal State
   const [selectedFarmer, setSelectedFarmer] = useState<Farmer | undefined>(undefined);
@@ -48,9 +52,25 @@ const Dashboard = () => {
       setIsModalOpen(true);
   };
   
-  // No-op for save since this is just a view/edit from dashboard
-  const handleSave = async () => {
-    // In a real app, update state/backend here
+  // Save handler for editing farmer from dashboard
+  const handleSave = async (farmerData: Omit<Farmer, 'id'> | Farmer) => {
+    if (!canEdit) {
+      throw new Error('You do not have permission to modify businesses.');
+    }
+    
+    const farmerId = (farmerData as Farmer).id;
+    if (!farmerId) {
+      throw new Error('Farmer ID is missing');
+    }
+    
+    console.log('💾 Dashboard: Saving farmer', farmerId, farmerData);
+    const updated = await farmerService.update(farmerId, farmerData);
+    console.log('✅ Dashboard: Farmer updated', updated);
+    
+    // Refresh dashboard data to show updated info
+    const dashboardData = await farmerService.getDashboardData();
+    setData(dashboardData);
+    
     setIsModalOpen(false);
   };
 
@@ -129,8 +149,18 @@ const Dashboard = () => {
                 <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Last Data Refresh</p>
                 <p className="text-2xl font-bold text-gray-900">{new Date().toLocaleDateString('en-GB')}</p>
              </div>
-             <button onClick={handleDownload} data-html2canvas-ignore="true" className="mt-4 px-4 py-2 bg-gray-900 border border-gray-900 shadow-md rounded-lg text-sm font-medium text-white hover:bg-gray-800 flex items-center gap-2 transition-all transform hover:-translate-y-0.5">
-                  <Download size={16} className="text-white" /> Download Report
+             <button 
+                  onClick={handleDownload} 
+                  data-html2canvas-ignore="true" 
+                  className={`mt-4 px-4 py-2 border shadow-md rounded-lg text-sm font-medium flex items-center gap-2 transition-all ${
+                    isViewer 
+                      ? 'bg-gray-200 border-gray-300 text-gray-400 cursor-not-allowed' 
+                      : 'bg-gray-900 border-gray-900 text-white hover:bg-gray-800 transform hover:-translate-y-0.5'
+                  }`}
+                  disabled={isViewer}
+                  title={isViewer ? "Download disabled for viewers" : "Download Report"}
+                >
+                  <Download size={16} className={isViewer ? "text-gray-400" : "text-white"} /> Download Report
             </button>
         </div>
       </div>
@@ -213,6 +243,7 @@ const Dashboard = () => {
             onSave={handleSave}
             initialData={selectedFarmer}
             mode="edit"
+            readOnly={isViewer}
           />
        )}
     </div>

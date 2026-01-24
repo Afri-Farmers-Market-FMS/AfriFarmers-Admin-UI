@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { User, Shield, Save, Users, Plus, Trash2, Edit, AlertCircle, Lock, ShieldCheck, Smartphone, X } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 interface SystemUser {
     id: number;
@@ -11,6 +12,10 @@ interface SystemUser {
 }
 
 const Settings = () => {
+  const { user } = useAuth();
+  const isViewer = user?.role === 'Viewer';
+  const canManageUsers = user?.role === 'Super Admin';
+  
   const [activeTab, setActiveTab] = useState<'profile' | 'users' | 'security'>('profile');
   const [currentUserRole] = useState<'Super Admin' | 'Admin'>('Super Admin'); // Simulating logged-in user
 
@@ -73,7 +78,7 @@ const Settings = () => {
 
   const menuItems = [
       { id: 'profile', label: 'My Profile', icon: User },
-      { id: 'users', label: 'User Management', icon: Users },
+      ...(canManageUsers ? [{ id: 'users', label: 'User Management', icon: Users }] : []),
       { id: 'security', label: 'Security & Access', icon: ShieldCheck },
   ];
 
@@ -128,29 +133,37 @@ const Settings = () => {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
                                 <label className="block text-sm font-bold text-gray-700 mb-1">Full Name</label>
-                                <input type="text" defaultValue="John Doe" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" />
+                                <input type="text" defaultValue={user?.name || "John Doe"} className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${isViewer ? 'bg-gray-100 cursor-not-allowed' : ''}`} disabled={isViewer} readOnly={isViewer} />
                             </div>
                             <div>
                                 <label className="block text-sm font-bold text-gray-700 mb-1">Email Address</label>
-                                <input type="email" defaultValue="super@afrifarmers.com" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" />
+                                <input type="email" defaultValue={user?.email || "super@afrifarmers.com"} className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${isViewer ? 'bg-gray-100 cursor-not-allowed' : ''}`} disabled={isViewer} readOnly={isViewer} />
                             </div>
                             <div>
                                 <label className="block text-sm font-bold text-gray-700 mb-1">Phone Number</label>
-                                <input type="text" defaultValue="+250 788 123 456" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" />
+                                <input type="text" defaultValue="+250 788 123 456" className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${isViewer ? 'bg-gray-100 cursor-not-allowed' : ''}`} disabled={isViewer} readOnly={isViewer} />
                             </div>
                             <div>
                                 <label className="block text-sm font-bold text-gray-700 mb-1">System Role</label>
-                                <div className="flex items-center gap-2 px-3 py-2 border border-gray-200 bg-green-50 rounded-lg text-green-800 font-medium">
-                                    <Shield size={16}/> Super Admin
+                                <div className={`flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg font-medium ${
+                                    user?.role === 'Super Admin' ? 'bg-purple-50 text-purple-800' :
+                                    user?.role === 'Admin' ? 'bg-blue-50 text-blue-800' :
+                                    'bg-gray-50 text-gray-800'
+                                }`}>
+                                    <Shield size={16}/> {user?.role || 'Viewer'}
                                 </div>
                             </div>
                         </div>
                     </div>
                     <div className="px-6 py-4 bg-gray-50 flex justify-end">
-                        <button className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 shadow-sm transition-all focus:ring-4 focus:ring-green-500/20">
-                            <Save size={18} className="mr-2" />
-                            Save Changes
-                        </button>
+                        {!isViewer ? (
+                            <button className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 shadow-sm transition-all focus:ring-4 focus:ring-green-500/20">
+                                <Save size={18} className="mr-2" />
+                                Save Changes
+                            </button>
+                        ) : (
+                            <span className="text-sm text-gray-500 italic">Profile editing is disabled for Viewers</span>
+                        )}
                     </div>
                 </div>
             )}
@@ -254,13 +267,17 @@ const Settings = () => {
                         </div>
                         <div className="p-6">
                             <div className="flex items-start gap-4 mb-8">
-                                <div className="p-3 bg-orange-100 text-orange-600 rounded-lg">
+                                <div className={`p-3 rounded-lg ${isViewer ? 'bg-gray-100 text-gray-400' : 'bg-orange-100 text-orange-600'}`}>
                                     <Lock size={24} />
                                 </div>
                                 <div>
                                     <h4 className="text-base font-bold text-gray-900">Password Management</h4>
                                     <p className="text-sm text-gray-500 mt-1 mb-4">Update your account password regularly to keep your account secure.</p>
-                                    <button onClick={() => setShowPasswordModal(true)} className="text-sm font-bold text-green-600 hover:text-green-700 border border-green-200 hover:bg-green-50 px-4 py-2 rounded-lg transition-all">Change Password</button>
+                                    {!isViewer ? (
+                                        <button onClick={() => setShowPasswordModal(true)} className="text-sm font-bold text-green-600 hover:text-green-700 border border-green-200 hover:bg-green-50 px-4 py-2 rounded-lg transition-all">Change Password</button>
+                                    ) : (
+                                        <span className="text-sm text-gray-400 italic">Password change is disabled for Viewers</span>
+                                    )}
                                 </div>
                             </div>
 

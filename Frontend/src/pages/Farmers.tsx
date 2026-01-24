@@ -20,10 +20,25 @@ const formatDate = (dateStr: string) => {
   });
 };
 
+// Highlight matching text in search results
+const highlightText = (text: string | undefined, query: string): React.ReactNode => {
+  if (!text || !query.trim()) return text || '-';
+  
+  const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+  const parts = text.split(regex);
+  
+  return parts.map((part, i) => 
+    regex.test(part) ? (
+      <mark key={i} className="bg-yellow-200 text-yellow-900 px-0.5 rounded">{part}</mark>
+    ) : part
+  );
+};
+
 const Farmers = () => {
     // --- Auth ---
     const { user } = useAuth();
     const canEdit = user?.role === 'Super Admin' || user?.role === 'Admin';
+    const isViewer = user?.role === 'Viewer';
     
     // --- Data State ---
     const [businesses, setBusinesses] = useState<Farmer[]>([]);
@@ -97,9 +112,10 @@ const Farmers = () => {
             const q = searchQuery.toLowerCase();
             result = result.filter(b => 
                 b.businessName?.toLowerCase().includes(q) || 
-                b.valueChain?.toLowerCase().includes(q) || 
                 b.ownerName?.toLowerCase().includes(q) ||
-                b.tin?.includes(q)
+                b.tin?.includes(q) ||
+                b.phone?.includes(q) ||
+                b.crops?.some(crop => crop.name?.toLowerCase().includes(q))
             );
         }
 
@@ -189,6 +205,14 @@ const Farmers = () => {
         console.log('🆔 Business ID:', business.id);
         setSelectedBusiness(business);
         setModalMode('edit');
+        setIsModalOpen(true);
+    };
+
+    const handleView = (e: React.MouseEvent, business: Farmer) => {
+        e.stopPropagation(); // Prevent row click
+        console.log('👁️ View clicked for business:', business);
+        setSelectedBusiness(business);
+        setModalMode('edit'); // Still use edit mode but readOnly prop makes it view-only
         setIsModalOpen(true);
     };
 
@@ -473,8 +497,9 @@ const Farmers = () => {
 
                     <button 
                         onClick={handleExportCSV}
-                        className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors border border-transparent hover:border-gray-300"
-                        title="Export displayed list to CSV"
+                        className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors border border-transparent ${isViewer ? 'bg-gray-50 text-gray-400 cursor-not-allowed' : 'bg-gray-100 hover:bg-gray-200 text-gray-700 hover:border-gray-300'}`}
+                        title={isViewer ? "Export disabled for viewers" : "Export displayed list to CSV"}
+                        disabled={isViewer}
                     >
                         <FileSpreadsheet size={18} /> <span className="hidden sm:inline">Export</span>
                     </button>
@@ -598,6 +623,7 @@ const Farmers = () => {
                                         <th className="px-2 py-2 min-w-[50px] whitespace-nowrap">Y. Emp</th>
                                         <th className="px-2 py-2 min-w-[80px] whitespace-nowrap">Perm. Emp</th>
                                         <th className="px-2 py-2 min-w-[150px] whitespace-nowrap">Value Chain</th>
+                                        <th className="px-2 py-2 min-w-[180px] whitespace-nowrap">Production & Crops</th>
                                         <th className="px-2 py-2 min-w-[200px] whitespace-nowrap">Description</th>
                                         <th className="px-2 py-2 min-w-[100px] whitespace-nowrap">Support</th>
                                         <th className="px-2 py-2 min-w-[80px] whitespace-nowrap">Joined</th>
@@ -609,6 +635,7 @@ const Farmers = () => {
                                         <th className="px-6 py-4">Type & Ownership</th>
                                         <th className="px-6 py-4">Location</th>
                                         <th className="px-6 py-4">Financials</th>
+                                        <th className="px-6 py-4">Production & Crops</th>
                                         <th className="px-6 py-4">Started</th>
                                         <th className="px-6 py-4 text-right">Actions</th>
                                     </>
@@ -625,19 +652,19 @@ const Farmers = () => {
                                     {viewMode === 'detailed' ? (
                                         <>
                                             <td className="px-2 py-1.5 border-r border-gray-50">{business.id}</td>
-                                            <td className="px-2 py-1.5 font-semibold text-gray-900 border-r border-gray-50">{business.businessName}</td>
+                                            <td className="px-2 py-1.5 font-semibold text-gray-900 border-r border-gray-50">{highlightText(business.businessName, searchQuery)}</td>
                                             <td className="px-2 py-1.5 border-r border-gray-50">
                                                 <span className={`px-1.5 py-0.5 rounded text-[10px] uppercase font-bold ${business.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
                                                     {business.status || 'Active'}
                                                 </span>
                                             </td>
-                                            <td className="px-2 py-1.5 font-mono text-gray-500 border-r border-gray-50">{business.tin}</td>
-                                            <td className="px-2 py-1.5 border-r border-gray-50 text-gray-700">{business.ownerName}</td>
-                                            <td className="px-2 py-1.5 font-mono text-gray-600 border-r border-gray-50">{business.phone}</td>
+                                            <td className="px-2 py-1.5 font-mono text-gray-500 border-r border-gray-50">{highlightText(business.tin, searchQuery)}</td>
+                                            <td className="px-2 py-1.5 border-r border-gray-50 text-gray-700">{highlightText(business.ownerName, searchQuery)}</td>
+                                            <td className="px-2 py-1.5 font-mono text-gray-600 border-r border-gray-50">{highlightText(business.phone, searchQuery)}</td>
                                             <td className="px-2 py-1.5 font-mono text-gray-500 border-r border-gray-50 min-w-[120px]">
                                                 <div className="flex items-center gap-2 group/nid">
-                                                    <span>{visibleNids[business.id] ? (business.nid || '-') : (business.nid ? '***********' : '-')}</span>
-                                                    {business.nid && (
+                                                    <span>{isViewer ? '***********' : (visibleNids[business.id] ? (business.nid || '-') : (business.nid ? '***********' : '-'))}</span>
+                                                    {business.nid && !isViewer && (
                                                         <button 
                                                         onClick={(e) => toggleNid(e, String(business.id))} 
                                                         className="opacity-0 group-hover/nid:opacity-100 transition-opacity p-1 hover:bg-green-100 rounded-full text-green-600"
@@ -669,13 +696,26 @@ const Farmers = () => {
                                             <td className="px-2 py-1.5 text-center border-r border-gray-50">{business.youthEmployees || 0}</td>
                                             <td className="px-2 py-1.5 text-center border-r border-gray-50">{business.permanentEmployees ? 'Yes' : 'No'}</td>
                                             <td className="px-2 py-1.5 border-r border-gray-50 truncate max-w-[150px]" title={business.valueChain}>{business.valueChain}</td>
+                                            <td className="px-2 py-1.5 border-r border-gray-50">
+                                                {business.crops && business.crops.length > 0 ? (
+                                                    <div className="flex flex-wrap gap-1">
+                                                        {business.crops.slice(0, 3).map((crop, idx) => (
+                                                            <span key={idx} className="bg-green-50 text-green-700 text-[10px] px-1.5 py-0.5 rounded" title={`${crop.quantity} ${crop.unit}`}>
+                                                                {highlightText(crop.name, searchQuery)}
+                                                            </span>
+                                                        ))}
+                                                        {business.crops.length > 3 && <span className="text-gray-400 text-[10px]">+{business.crops.length - 3}</span>}
+                                                    </div>
+                                                ) : <span className="text-gray-400">-</span>}
+                                            </td>
                                             <td className="px-2 py-1.5 border-r border-gray-50 truncate max-w-[200px]" title={business.companyDescription}>{business.companyDescription || '-'}</td>
                                             <td className="px-2 py-1.5 border-r border-gray-50 truncate max-w-[100px]" title={business.supportReceived}>{business.supportReceived || '-'}</td>
                                             <td className="px-2 py-1.5 text-gray-500">{formatDate(business.commencementDate)}</td>
                                             <td className="px-2 py-1.5 text-center sticky right-0 bg-white group-hover:bg-green-50 shadow-l">
                                                 <div className="flex justify-center gap-1">
+                                                    {isViewer && <button onClick={(e) => handleView(e, business)} className="p-1 text-gray-600 hover:bg-gray-100 rounded" title="View Profile"><Eye size={14}/></button>}
                                                     {canEdit && <button onClick={(e) => handleEdit(e, business)} className="p-1 text-blue-600 hover:bg-blue-50 rounded" title="Edit"><Edit size={14}/></button>}
-                                                    <button onClick={(e) => handleDownloadProfile(e, business)} className="p-1 text-green-600 hover:bg-green-50 rounded" title="Download Profile"><Download size={14}/></button>
+                                                    {!isViewer && <button onClick={(e) => handleDownloadProfile(e, business)} className="p-1 text-green-600 hover:bg-green-50 rounded" title="Download Profile"><Download size={14}/></button>}
                                                     {canEdit && <button onClick={(e) => handleDelete(e, business.id)} className="p-1 text-red-500 hover:bg-red-50 rounded" title="Delete"><Trash2 size={14}/></button>}
                                                 </div>
                                             </td>
@@ -688,9 +728,9 @@ const Farmers = () => {
                                                         {business.businessName.substring(0, 2).toUpperCase()}
                                                     </div>
                                                     <div>
-                                                        <div className="font-bold text-gray-900 text-base group-hover:text-green-700 transition-colors">{business.businessName}</div>
+                                                        <div className="font-bold text-gray-900 text-base group-hover:text-green-700 transition-colors">{highlightText(business.businessName, searchQuery)}</div>
                                                         <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-1">
-                                                            <span className="bg-gray-100 px-1.5 py-0.5 rounded text-gray-600 font-medium">TIN: {business.tin}</span>
+                                                            <span className="bg-gray-100 px-1.5 py-0.5 rounded text-gray-600 font-medium">TIN: {highlightText(business.tin, searchQuery)}</span>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -716,6 +756,20 @@ const Farmers = () => {
                                                 <div className="text-gray-900 font-bold">{business.revenue}</div>
                                                 <div className="text-xs text-gray-500 flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-gray-300"></span> Annual Rev.</div>
                                             </td>
+                                            <td className="px-6 py-4">
+                                                {business.crops && business.crops.length > 0 ? (
+                                                    <div className="flex flex-wrap gap-1">
+                                                        {business.crops.slice(0, 2).map((crop, idx) => (
+                                                            <span key={idx} className="bg-green-50 text-green-700 text-xs px-2 py-1 rounded-md font-medium" title={`${crop.quantity} ${crop.unit}`}>
+                                                                {highlightText(crop.name, searchQuery)}
+                                                            </span>
+                                                        ))}
+                                                        {business.crops.length > 2 && <span className="text-gray-400 text-xs">+{business.crops.length - 2} more</span>}
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-gray-400 text-sm">No crops listed</span>
+                                                )}
+                                            </td>
                                             <td className="px-6 py-4 text-gray-600 font-medium">
                                                 <div className="flex items-center gap-2">
                                                     <Calendar size={14} className="text-gray-400" />
@@ -724,9 +778,16 @@ const Farmers = () => {
                                             </td>
                                             <td className="px-6 py-4 text-right">
                                                 <div className="flex justify-end gap-2 opacity-60 group-hover:opacity-100 transition-all transform translate-x-2 group-hover:translate-x-0">
-                                                    <button onClick={(e) => handleDownloadProfile(e, business)} className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors shadow-sm border border-transparent hover:border-green-100" title="Download Profile">
-                                                        <Download size={16} />
-                                                    </button>
+                                                    {isViewer && (
+                                                        <button onClick={(e) => handleView(e, business)} className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors shadow-sm border border-transparent hover:border-gray-200" title="View Profile">
+                                                            <Eye size={16} />
+                                                        </button>
+                                                    )}
+                                                    {!isViewer && (
+                                                        <button onClick={(e) => handleDownloadProfile(e, business)} className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors shadow-sm border border-transparent hover:border-green-100" title="Download Profile">
+                                                            <Download size={16} />
+                                                        </button>
+                                                    )}
                                                     {canEdit && (
                                                         <button onClick={(e) => handleEdit(e, business)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors shadow-sm border border-transparent hover:border-blue-100" title="Edit Details">
                                                             <Edit size={16} />
@@ -806,7 +867,8 @@ const Farmers = () => {
                 onClose={() => setIsModalOpen(false)} 
                 onSave={handleSave} 
                 initialData={selectedBusiness} 
-                mode={modalMode} 
+                mode={modalMode}
+                readOnly={isViewer}
             />
         </div>
     );
