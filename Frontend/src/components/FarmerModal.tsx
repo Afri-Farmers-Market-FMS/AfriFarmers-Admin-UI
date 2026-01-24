@@ -51,7 +51,9 @@ const FarmerModal = ({ isOpen, onClose, onSave, initialData, mode }: FarmerModal
   const [showCropForm, setShowCropForm] = useState(false);
 
   useEffect(() => {
+    console.log('🔄 FarmerModal useEffect - mode:', mode, 'initialData:', initialData);
     if (initialData && mode === 'edit') {
+      console.log('📥 Setting formData from initialData, id:', initialData.id);
       setFormData(initialData);
     } else {
        // Reset for add mode
@@ -93,12 +95,22 @@ const FarmerModal = ({ isOpen, onClose, onSave, initialData, mode }: FarmerModal
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
+    console.log('📝 handleChange:', name, '=', value, '(type:', type, ')');
     if (name === 'permanentEmployees') {
-        setFormData(prev => ({ ...prev, [name]: value === 'true' }));
+        setFormData(prev => {
+          console.log('   prev.id:', (prev as any).id);
+          return { ...prev, [name]: value === 'true' };
+        });
     } else if (type === 'number') {
-        setFormData(prev => ({ ...prev, [name]: Number(value) }));
+        setFormData(prev => {
+          console.log('   prev.id:', (prev as any).id);
+          return { ...prev, [name]: Number(value) };
+        });
     } else {
-        setFormData(prev => ({ ...prev, [name]: value }));
+        setFormData(prev => {
+          console.log('   prev.id:', (prev as any).id);
+          return { ...prev, [name]: value };
+        });
     }
   };
 
@@ -128,13 +140,17 @@ const FarmerModal = ({ isOpen, onClose, onSave, initialData, mode }: FarmerModal
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('📝 FarmerModal.handleSubmit called');
+    console.log('📋 formData:', formData);
+    console.log('🆔 formData.id:', (formData as any).id);
     setLoading(true);
     try {
       await onSave(formData as Farmer);
+      console.log('✅ Save successful');
       onClose();
-    } catch (error) {
-      console.error(error);
-      alert('Failed to save business');
+    } catch (error: any) {
+      console.error('❌ Save failed:', error);
+      alert('Failed to save business: ' + (error?.message || 'Unknown error'));
     } finally {
       setLoading(false);
     }

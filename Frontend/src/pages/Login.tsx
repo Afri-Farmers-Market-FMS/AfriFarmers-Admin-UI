@@ -1,44 +1,33 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Sprout, Lock, Mail, ChevronRight, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { Sprout, Lock, Mail, ChevronRight, AlertCircle, Eye, EyeOff, Wifi, WifiOff } from 'lucide-react';
 
 const Login = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
+    const [localLoading, setLocalLoading] = useState(false);
     
-    const { login } = useAuth();
+    const { login, isLoading: authLoading, isBackendAvailable } = useAuth();
     const navigate = useNavigate();
-
-    // Specific credentials for demo
-    const CREDENTIALS = {
-        'super@afrifarmers.com': { password: 'password123', role: 'Super Admin', name: 'John Doe' },
-        'admin@afrifarmers.com': { password: 'password123', role: 'Admin', name: 'Jane Smith' },
-        'viewer@afrifarmers.com': { password: 'password123', role: 'Viewer', name: 'Guest User' }
-    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
-        setIsLoading(true);
+        setLocalLoading(true);
 
-        // Simulate API delay
-        setTimeout(() => {
-            const userKey = email.toLowerCase() as keyof typeof CREDENTIALS;
-            const validUser = CREDENTIALS[userKey];
-
-            if (validUser && validUser.password === password) {
-                login(email, validUser.role as any, validUser.name);
-                navigate('/dashboard');
-            } else {
-                setError('Invalid email or password. Please check the demo credentials.');
-                setIsLoading(false);
-            }
-        }, 800);
+        try {
+            await login(email, password);
+            navigate('/');
+        } catch (err: any) {
+            setError(err.message || 'Invalid email or password.');
+            setLocalLoading(false);
+        }
     };
+
+    const isLoading = localLoading || authLoading;
 
     return (
         <div className="min-h-screen bg-green-50 flex items-center justify-center p-4">
@@ -99,13 +88,20 @@ const Login = () => {
                             </div>
                         </div>
 
-                        {/* Demo Hint */}
-                        <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg text-xs text-blue-800">
-                           <p className="font-bold mb-1">Demo Credentials:</p>
-                           <ul className="space-y-1 pl-3 list-disc">
-                             <li><span className="font-semibold">Super:</span> super@afrifarmers.com / password123</li>
-                             <li><span className="font-semibold">Admin:</span> admin@afrifarmers.com / password123</li>
-                             <li><span className="font-semibold">Viewer:</span> viewer@afrifarmers.com / password123</li>
+                        {/* Connection Status & Demo Hint */}
+                        <div className={`p-3 ${isBackendAvailable ? 'bg-green-50 border-green-100' : 'bg-amber-50 border-amber-100'} border rounded-lg text-xs`}>
+                           <div className="flex items-center gap-2 mb-2">
+                             {isBackendAvailable ? (
+                               <><Wifi size={14} className="text-green-600" /><span className="font-bold text-green-800">Backend Connected</span></>
+                             ) : (
+                               <><WifiOff size={14} className="text-amber-600" /><span className="font-bold text-amber-800">Offline Mode</span></>
+                             )}
+                           </div>
+                           <p className="font-bold mb-1 text-gray-700">Login Credentials:</p>
+                           <ul className="space-y-1 pl-3 list-disc text-gray-600">
+                             <li><span className="font-semibold">Super Admin:</span> admin@afrifarmers.rw / admin123</li>
+                             <li><span className="font-semibold">Admin:</span> john@afrifarmers.rw / user123</li>
+                             <li><span className="font-semibold">Viewer:</span> jane@afrifarmers.rw / viewer123</li>
                            </ul>
                         </div>
 

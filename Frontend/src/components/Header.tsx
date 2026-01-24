@@ -1,12 +1,30 @@
 import { LayoutDashboard, Users, Settings, PieChart, LogOut, Menu, X } from 'lucide-react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
+import { useAuth } from '../context/AuthContext';
 import logo from '../assets/logo.png';
 
 const Header = () => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const { user, logout } = useAuth();
+    const navigate = useNavigate();
 
     const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
+
+    const handleLogout = () => {
+        logout();
+        navigate('/login');
+    };
+
+    // Get user initials
+    const getInitials = (name: string) => {
+        return name
+            .split(' ')
+            .map(n => n[0])
+            .join('')
+            .toUpperCase()
+            .slice(0, 2);
+    };
 
     const navItems = [
         { to: "/", icon: <LayoutDashboard size={20} />, label: "Dashboard" },
@@ -52,11 +70,17 @@ const Header = () => {
 
                     {/* User Profile / Logout */}
                     <div className="hidden md:flex items-center pl-4 border-l border-green-800 ml-4">
-                        <button className="flex items-center gap-2 text-sm text-green-100 hover:text-white transition-colors">
+                        <button 
+                            onClick={handleLogout}
+                            className="flex items-center gap-2 text-sm text-green-100 hover:text-white transition-colors"
+                        >
                             <div className="w-8 h-8 rounded-full bg-green-700 flex items-center justify-center border border-green-600">
-                                <span className="font-bold text-xs">AD</span>
+                                <span className="font-bold text-xs">{user ? getInitials(user.name) : 'U'}</span>
                             </div>
-                            <span className="font-medium">Admin</span>
+                            <div className="flex flex-col items-start">
+                                <span className="font-medium">{user?.name || 'User'}</span>
+                                <span className="text-[10px] text-green-300">{user?.role || 'Guest'}</span>
+                            </div>
                             <LogOut size={16} className="ml-2 opacity-75" />
                         </button>
                     </div>
@@ -92,7 +116,10 @@ const Header = () => {
                             </NavLink>
                         ))}
                         <div className="border-t border-green-800 mt-4 pt-4 pb-2">
-                             <button className="flex items-center px-3 py-2 text-base font-medium text-green-100 hover:bg-green-800 hover:text-white w-full">
+                             <button 
+                                onClick={handleLogout}
+                                className="flex items-center px-3 py-2 text-base font-medium text-green-100 hover:bg-green-800 hover:text-white w-full"
+                             >
                                 <LogOut size={20} className="mr-3" /> Sign Out
                              </button>
                         </div>

@@ -8,6 +8,7 @@ import {
 import { farmerService } from '../services/api'; 
 import { Farmer } from '../types';
 import FarmerModal from '../components/FarmerModal';
+import { useAuth } from '../context/AuthContext';
 
 // @ts-ignore
 import html2pdf from 'html2pdf.js';
@@ -20,9 +21,14 @@ const formatDate = (dateStr: string) => {
 };
 
 const Farmers = () => {
+    // --- Auth ---
+    const { user } = useAuth();
+    const canEdit = user?.role === 'Super Admin' || user?.role === 'Admin';
+    
     // --- Data State ---
     const [businesses, setBusinesses] = useState<Farmer[]>([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     
     // --- Refs ---
     const tableContainerRef = useRef<HTMLDivElement>(null);
@@ -58,17 +64,25 @@ const Farmers = () => {
 
     // --- Load Data ---
     const loadBusinesses = async () => {
+        console.log('🔄 loadBusinesses called');
         setLoading(true);
+        setError(null);
         try {
             const data = await farmerService.getAll();
-            setBusinesses(data);
-        } catch (e) { console.error(e); } 
+            console.log('📋 Loaded', data?.length, 'businesses');
+            setBusinesses(data || []);
+        } catch (e: any) { 
+            console.error('❌ loadBusinesses error:', e);
+            setError(e.message || 'Failed to load businesses');
+        } 
         finally { setLoading(false); }
     };
 
+    // Reload data when user changes (login/logout)
     useEffect(() => {
+        console.log('👤 User changed, reloading data. User:', user?.email);
         loadBusinesses();
-    }, []);
+    }, [user]);
 
     // --- Derivations (Unique Values for Dropdowns) ---
     const districts = useMemo(() => Array.from(new Set(businesses.map(b => b.district).filter(Boolean).sort())), [businesses]);
@@ -171,12 +185,16 @@ const Farmers = () => {
 
     const handleEdit = (e: React.MouseEvent, business: Farmer) => {
         e.stopPropagation(); // Prevent row click
+        console.log('✏️ Edit clicked for business:', business);
+        console.log('🆔 Business ID:', business.id);
         setSelectedBusiness(business);
         setModalMode('edit');
         setIsModalOpen(true);
     };
 
     const handleRowClick = (business: Farmer) => {
+        console.log('👆 Row clicked for business:', business);
+        console.log('🆔 Business ID:', business.id);
         setSelectedBusiness(business);
         setModalMode('edit'); // Or maybe a 'view' mode, but 'edit' shows full info form which is what user wants "see how form looks"
         setIsModalOpen(true);
@@ -184,21 +202,65 @@ const Farmers = () => {
 
     const handleDelete = async (e: React.MouseEvent, id: number) => {
         e.stopPropagation();
+        if (!canEdit) {
+            alert('You do not have permission to delete businesses. Admin or Super Admin role required.');
+            return;
+        }
         if(confirm('Are you sure you want to delete this business?')) {
-            await farmerService.delete(id);
-            setBusinesses(prev => prev.filter(b => b.id !== id));
+            try {
+                setError(null);
+                await farmerService.delete(id);
+                setBusinesses(prev => prev.filter(b => b.id !== id));
+            } catch (err: any) {
+                setError(err.message || 'Failed to delete business');
+                alert(`Failed to delete: ${err.message || 'Unknown error'}`);
+            }
         }
     };
 
     const handleSave = async (farmerData: Omit<Farmer, 'id'> | Farmer) => {
-        if (modalMode === 'add') {
-            const newFarmer = await farmerService.create(farmerData as Omit<Farmer, 'id'>);
-            setBusinesses(prev => [newFarmer, ...prev]);
-        } else {
-            const updated = await farmerService.update((farmerData as Farmer).id, farmerData);
-            setBusinesses(prev => prev.map(b => b.id === updated.id ? updated : b));
+        console.log('💾 Farmers.handleSave called');
+        console.log('📋 farmerData:', farmerData);
+        console.log('🔧 modalMode:', modalMode);
+        
+        if (!canEdit) {
+            throw new Error('You do not have permission to modify businesses. Admin or Super Admin role required.');
         }
-        setIsModalOpen(false);
+        try {
+            setError(null);
+            if (modalMode === 'add') {
+                console.log('➕ Creating new farmer...');
+                const newFarmer = await farmerService.create(farmerData as Omit<Farmer, 'id'>);
+                console.log('✅ Created:', newFarmer);
+                setBusinesses(prev => [newFarmer, ...prev]);
+            } else {
+                const farmerId = (farmerData as Farmer).id;
+                console.log('🔄 Updating farmer with ID:', farmerId);
+                if (!farmerId) {
+                    throw new Error('Farmer ID is missing - cannot update');
+                }
+                const updated = await farmerService.update(farmerId, farmerData);
+                console.log('✅ Updated farmer:', updated);
+                console.log('   Updated ID:', updated.id);
+                console.log('   Updated Name:', updated.businessName);
+                
+                // Update the local state with the response from the server
+                setBusinesses(prev => {
+                    const newList = prev.map(b => b.id === updated.id ? updated : b);
+                    console.log('📋 Updated businesses list, farmer at index:', newList.findIndex(b => b.id === updated.id));
+                    return newList;
+                });
+                
+                // Also refresh the entire list to ensure we have the latest data
+                console.log('🔄 Refreshing all data from server...');
+                await loadBusinesses();
+            }
+            setIsModalOpen(false);
+        } catch (err: any) {
+            console.error('❌ handleSave error:', err);
+            setError(err.message || 'Failed to save business');
+            throw err; // Re-throw so FarmerModal can show the error
+        }
     };
 
     const handleExportCSV = () => {
@@ -356,13 +418,26 @@ const Farmers = () => {
 
     return (
         <div className="flex flex-col h-full bg-transparent max-w-full overflow-hidden">
+            {/* Error Banner */}
+            {error && (
+                <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-red-700">
+                        <X size={18} />
+                        <span>{error}</span>
+                    </div>
+                    <button onClick={() => setError(null)} className="text-red-500 hover:text-red-700">
+                        <X size={18} />
+                    </button>
+                </div>
+            )}
+            
             {/* Toolbar */}
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6 bg-white p-4 rounded-xl shadow-sm border border-gray-100">
                 <div>
                    <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
                        <Briefcase className="text-green-600" /> Business Directory
                    </h1>
-                   <p className="text-gray-500 text-sm mt-1">Manage {businesses.length} enterprises</p>
+                   <p className="text-gray-500 text-sm mt-1">Manage {businesses.length} enterprises {!canEdit && <span className="text-amber-600">(Read-only mode)</span>}</p>
                 </div>
                 
                 <div className="flex flex-wrap gap-3 w-full lg:w-auto items-center">
@@ -411,9 +486,11 @@ const Farmers = () => {
                         <Filter size={18} /> <span className="hidden sm:inline">Filter</span>
                     </button>
 
-                    <button onClick={handleAdd} className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-green-700 shadow-sm hover:shadow-md transition-all">
-                        <Plus size={18} /> <span className="hidden sm:inline">Add New</span>
-                    </button>
+                    {canEdit && (
+                        <button onClick={handleAdd} className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-green-700 shadow-sm hover:shadow-md transition-all">
+                            <Plus size={18} /> <span className="hidden sm:inline">Add New</span>
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -597,9 +674,9 @@ const Farmers = () => {
                                             <td className="px-2 py-1.5 text-gray-500">{formatDate(business.commencementDate)}</td>
                                             <td className="px-2 py-1.5 text-center sticky right-0 bg-white group-hover:bg-green-50 shadow-l">
                                                 <div className="flex justify-center gap-1">
-                                                    <button onClick={(e) => handleEdit(e, business)} className="p-1 text-blue-600 hover:bg-blue-50 rounded" title="Edit"><Edit size={14}/></button>
+                                                    {canEdit && <button onClick={(e) => handleEdit(e, business)} className="p-1 text-blue-600 hover:bg-blue-50 rounded" title="Edit"><Edit size={14}/></button>}
                                                     <button onClick={(e) => handleDownloadProfile(e, business)} className="p-1 text-green-600 hover:bg-green-50 rounded" title="Download Profile"><Download size={14}/></button>
-                                                    <button onClick={(e) => handleDelete(e, business.id)} className="p-1 text-red-500 hover:bg-red-50 rounded" title="Delete"><Trash2 size={14}/></button>
+                                                    {canEdit && <button onClick={(e) => handleDelete(e, business.id)} className="p-1 text-red-500 hover:bg-red-50 rounded" title="Delete"><Trash2 size={14}/></button>}
                                                 </div>
                                             </td>
                                         </>
@@ -650,12 +727,16 @@ const Farmers = () => {
                                                     <button onClick={(e) => handleDownloadProfile(e, business)} className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors shadow-sm border border-transparent hover:border-green-100" title="Download Profile">
                                                         <Download size={16} />
                                                     </button>
-                                                    <button onClick={(e) => handleEdit(e, business)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors shadow-sm border border-transparent hover:border-blue-100" title="Edit Details">
-                                                        <Edit size={16} />
-                                                    </button>
-                                                    <button onClick={(e) => handleDelete(e, business.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors shadow-sm border border-transparent hover:border-red-100" title="Remove Business">
-                                                        <Trash2 size={16} />
-                                                    </button>
+                                                    {canEdit && (
+                                                        <button onClick={(e) => handleEdit(e, business)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors shadow-sm border border-transparent hover:border-blue-100" title="Edit Details">
+                                                            <Edit size={16} />
+                                                        </button>
+                                                    )}
+                                                    {canEdit && (
+                                                        <button onClick={(e) => handleDelete(e, business.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors shadow-sm border border-transparent hover:border-red-100" title="Remove Business">
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </td>
                                         </>
