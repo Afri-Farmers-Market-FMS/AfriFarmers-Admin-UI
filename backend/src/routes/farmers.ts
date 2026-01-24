@@ -826,8 +826,9 @@ router.post(
           }
 
           // Check for exact duplicate within the same Excel file
+          console.log(`   Checking within-file duplicates. seenInFile size: ${seenInFile.size}`);
           if (seenInFile.has(rowFingerprint)) {
-            console.log(`   ⚠️ Row ${rowNumber} is duplicate of another row in file`);
+            console.log(`   ⚠️ Row ${rowNumber} is duplicate of another row in file (fingerprint already seen)`);
             skippedDuplicates.push({
               row: rowNumber,
               reason: `Duplicate row in file (all fields match another row in this file)`,
@@ -836,6 +837,7 @@ router.post(
           }
 
           // Mark as seen for within-file duplicate detection
+          console.log(`   Adding fingerprint to seenInFile: "${rowFingerprint.substring(0, 50)}..."`);
           seenInFile.add(rowFingerprint);
         }
 
