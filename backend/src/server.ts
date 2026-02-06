@@ -78,10 +78,8 @@ app.use(errorHandler);
 // Start server
 const PORT = process.env.PORT || 5000;
 
-// Only start the server if not running in Vercel environment
-if (process.env.VERCEL !== '1') {
-  app.listen(PORT, () => {
-    console.log(`
+app.listen(PORT, () => {
+  console.log(`
 ╔═══════════════════════════════════════════════════════════╗
 ║                                                           ║
 ║   🌱 AfriFarmers Backend API Server                       ║
@@ -97,8 +95,5 @@ if (process.env.VERCEL !== '1') {
 ║   • Analytics: GET /api/analytics                         ║
 ║                                                           ║
 ╚═══════════════════════════════════════════════════════════╝
-    `);
-  });
-}
-
-export default app;
+  `);
+});
