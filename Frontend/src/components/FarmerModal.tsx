@@ -128,7 +128,7 @@ const FarmerModal = ({ isOpen, onClose, onSave, initialData, mode, readOnly = fa
         crops: [...(prev.crops || []), crop]
       }));
       setNewCrop({ name: '', quantity: 0, unit: 'kg' });
-      setShowCropForm(false);
+      // setShowCropForm(false);
     }
   };
 
