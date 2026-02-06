@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Lock, Mail, ChevronRight, AlertCircle, Eye, EyeOff, Wifi, WifiOff, Shield } from 'lucide-react';
+import { Lock, Mail, ChevronRight, AlertCircle, Eye, EyeOff, Shield } from 'lucide-react';
 import logo from '../assets/logo.png';
 
 const Login = () => {
@@ -15,7 +15,7 @@ const Login = () => {
     const [requiresTwoFactor, setRequiresTwoFactor] = useState(false);
     const [twoFactorCode, setTwoFactorCode] = useState('');
     
-    const { login, isLoading: authLoading, isBackendAvailable } = useAuth();
+    const { login, isLoading: authLoading } = useAuth();
     const navigate = useNavigate();
 
     const handleSubmit = async (e: React.FormEvent) => {

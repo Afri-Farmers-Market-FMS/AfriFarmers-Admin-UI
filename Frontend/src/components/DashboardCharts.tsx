@@ -32,7 +32,7 @@ export const OperationalScaleChart = ({ data }: ChartProps) => {
                 dataKey="value"
                 stroke="none"
               >
-                {data.map((entry, index) => (
+                {data.map((_, index) => (
                   <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                 ))}
               </Pie>
@@ -83,7 +83,7 @@ export const RegionalFootprintChart = ({ data }: ChartProps) => {
                 stroke="white"
                 strokeWidth={2}
               >
-                {data.map((entry, index) => (
+                {data.map((_, index) => (
                   <Cell key={`cell-${index}`} fill={DISTRICT_COLORS[index % DISTRICT_COLORS.length]} />
                 ))}
               </Pie>
@@ -252,7 +252,7 @@ export const OwnershipChart = ({ data }: ChartProps) => {
                 dataKey="value"
                 stroke="none"
                 >
-                {data.map((entry, index) => (
+                {data.map((_, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
                 </Pie>

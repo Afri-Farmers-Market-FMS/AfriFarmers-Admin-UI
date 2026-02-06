@@ -49,7 +49,7 @@ const FarmerModal = ({ isOpen, onClose, onSave, initialData, mode, readOnly = fa
 
   const [loading, setLoading] = useState(false);
   const [newCrop, setNewCrop] = useState<Partial<CropItem>>({ name: '', quantity: 0, unit: 'kg' });
-  const [showCropForm, setShowCropForm] = useState(false);
+  // const [showCropForm, setShowCropForm] = useState(false);
 
   useEffect(() => {
     console.log('🔄 FarmerModal useEffect - mode:', mode, 'initialData:', initialData);

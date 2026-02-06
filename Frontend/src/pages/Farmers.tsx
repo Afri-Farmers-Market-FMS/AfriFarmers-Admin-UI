@@ -2,7 +2,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Search, Filter, MapPin, Briefcase, Calendar, 
-  Trash2, Edit, Plus, X, Download, List, Grid, FileSpreadsheet, ChevronLeft, ChevronRight,
+  Trash2, Edit, Plus, X, List, Grid, FileSpreadsheet, ChevronLeft, ChevronRight,
   Eye, EyeOff, Upload, FileDown, AlertCircle, CheckCircle, Loader2 
 } from 'lucide-react';
 import { farmerService } from '../services/api'; 
@@ -171,8 +171,8 @@ const Farmers = () => {
     }, [user]);
 
     // --- Derivations (Unique Values for Dropdowns) ---
-    const districts = useMemo(() => Array.from(new Set(businesses.map(b => b.district).filter(Boolean).sort())), [businesses]);
-    const businessTypes = useMemo(() => Array.from(new Set(businesses.map(b => b.businessType).filter(Boolean).sort())), [businesses]);
+    // const districts = useMemo(() => Array.from(new Set(businesses.map(b => b.district).filter(Boolean).sort())), [businesses]);
+    // const businessTypes = useMemo(() => Array.from(new Set(businesses.map(b => b.businessType).filter(Boolean).sort())), [businesses]);
 
     // --- Filtering Logic ---
     const processedData = useMemo(() => {

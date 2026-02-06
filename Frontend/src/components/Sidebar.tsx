@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Users, Sprout, BarChart3, Settings, DollarSign, ChevronLeft, ChevronRight } from 'lucide-react';
+import { LayoutDashboard, Users, Sprout, BarChart3, Settings, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface SidebarProps {
   isCollapsed: boolean;

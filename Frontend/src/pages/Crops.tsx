@@ -1,4 +1,4 @@
-import { Sprout, TrendingUp, AlertCircle } from 'lucide-react';
+import { Sprout, AlertCircle } from 'lucide-react';
 
 const crops = [
   { id: 1, name: 'Maize', variety: 'Hybrid 614', season: 'Sep - Jan', marketPrice: '450 RWF/kg', trend: '+5%', color: 'bg-yellow-100 text-yellow-700' },

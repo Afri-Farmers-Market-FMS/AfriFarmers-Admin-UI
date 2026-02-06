@@ -3472,7 +3472,7 @@ export const initialFarmers: Farmer[] = [
   {
     "id": 103,
     "businessName": "",
-    "ownership": "",
+    "ownership": "Non youth-owned",
     "commencementDate": "",
     "province": "",
     "district": "",
