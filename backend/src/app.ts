@@ -33,6 +33,12 @@ app.use(cors({
     
     // Check against allowed origins
     const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5173').split(',');
+    
+    // Allow any Vercel deployment (useful for development/staging)
+    if (origin.endsWith('.vercel.app')) {
+      return callback(null, true);
+    }
+
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
